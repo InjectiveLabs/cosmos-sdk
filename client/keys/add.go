@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sort"
 
-	bip39 "github.com/cosmos/go-bip39"
+	"github.com/cosmos/go-bip39"
 	"github.com/spf13/cobra"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -88,7 +88,7 @@ func runAddCmdPrepare(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return runAddCmd(clientCtx, cmd, args, buf)
+	return RunAddCmd(clientCtx, cmd, args, buf)
 }
 
 /*
@@ -100,7 +100,7 @@ input
 output
 	- armor encrypted private key (saved to file)
 */
-func runAddCmd(ctx client.Context, cmd *cobra.Command, args []string, inBuf *bufio.Reader) error {
+func RunAddCmd(ctx client.Context, cmd *cobra.Command, args []string, inBuf *bufio.Reader) error {
 	var err error
 
 	name := args[0]

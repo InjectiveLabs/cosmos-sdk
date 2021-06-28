@@ -1,5 +1,3 @@
-// +build cgo,ledger,!test_ledger_mock
-
 package ledger
 
 import ledger "github.com/cosmos/ledger-cosmos-go"

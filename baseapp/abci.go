@@ -196,8 +196,13 @@ func (app *BaseApp) BeginBlock(req abci.RequestBeginBlock) (res abci.ResponseBeg
 		res = app.beginBlocker(app.deliverState.ctx, req)
 		res.Events = sdk.MarkEventsToIndex(res.Events, app.indexEvents)
 	}
+
 	// set the signed validators for addition to context in deliverTx
 	app.voteInfos = req.LastCommitInfo.GetVotes()
+
+	res.Events = append(res.Events, abci.Event{
+		Type: "inj_meta",
+	})
 
 	// call the hooks with the BeginBlock messages
 	for _, streamingListener := range app.abciListeners {

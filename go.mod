@@ -198,6 +198,8 @@ require (
 // Replace here are pending PRs, or version to be tagged
 // replace (
 // 	<temporary replace>
+replace cosmossdk.io/api => ./api
+
 // )
 replace cosmossdk.io/api => ./api
 

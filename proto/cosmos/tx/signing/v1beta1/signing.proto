@@ -54,7 +54,7 @@ enum SignMode {
 
   // Injective EIP712 support for any cosmos messages which uses proto-json encoded string for messages
   // Signature verification is implemented in injective core
-  SIGNMODE_EIP712_V2 = 128;
+  SIGN_MODE_EIP712_V2 = 128;
 }
 
 // SignatureDescriptors wraps multiple SignatureDescriptor's.

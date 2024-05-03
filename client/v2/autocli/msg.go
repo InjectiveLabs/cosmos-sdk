@@ -37,8 +37,8 @@ func (b *Builder) AddMsgServiceCommands(cmd *cobra.Command, cmdDescriptor *autoc
 	for cmdName, subCmdDescriptor := range cmdDescriptor.SubCommands {
 		subCmd := findSubCommand(cmd, cmdName)
 		if subCmd == nil {
-			short := subCmdDescriptor.Short
-			if short == "" {
+			short := cmdDescriptor.Short
+			if cmdDescriptor.Short == "" {
 				short = fmt.Sprintf("Tx commands for the %s service", subCmdDescriptor.Service)
 			}
 			subCmd = topLevelCmd(cmd.Context(), cmdName, short)

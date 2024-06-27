@@ -408,8 +408,9 @@ func (suite *KeeperTestSuite) TestQueryDenomsMetadata() {
 							Aliases:  []string{"ATOM"},
 						},
 					},
-					Base:    "uatom",
-					Display: "atom",
+					Base:     "uatom",
+					Display:  "atom",
+					Decimals: 6,
 				}
 
 				metadataEth := types.Metadata{
@@ -425,8 +426,9 @@ func (suite *KeeperTestSuite) TestQueryDenomsMetadata() {
 							Aliases:  []string{"ETH", "ether"},
 						},
 					},
-					Base:    "wei",
-					Display: "eth",
+					Base:     "wei",
+					Display:  "eth",
+					Decimals: 18,
 				}
 
 				suite.bankKeeper.SetDenomMetaData(suite.ctx, metadataAtom)
@@ -507,8 +509,9 @@ func (suite *KeeperTestSuite) TestQueryDenomMetadata() {
 							Aliases:  []string{"ATOM"},
 						},
 					},
-					Base:    "uatom",
-					Display: "atom",
+					Base:     "uatom",
+					Display:  "atom",
+					Decimals: 6,
 				}
 
 				suite.bankKeeper.SetDenomMetaData(suite.ctx, expMetadata)
@@ -584,8 +587,9 @@ func (suite *KeeperTestSuite) TestQueryDenomMetadataByQueryStringRequest() {
 							Aliases:  []string{"ATOM"},
 						},
 					},
-					Base:    "uatom",
-					Display: "atom",
+					Base:     "uatom",
+					Display:  "atom",
+					Decimals: 6,
 				}
 
 				suite.bankKeeper.SetDenomMetaData(suite.ctx, expMetadata)

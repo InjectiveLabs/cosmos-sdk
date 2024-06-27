@@ -115,4 +115,7 @@ message Metadata {
   // URIHash is a sha256 hash of a document pointed by URI. It's used to verify that
   // the document didn't change. Optional.
   string uri_hash = 8 [(gogoproto.customname) = "URIHash", (cosmos_proto.field_added_in) = "cosmos-sdk 0.46"];
+
+  // Decimals represent the number of decimals use to represent token amount on chain
+  uint32 decimals = 9 [(gogoproto.customname) = "Decimals", (cosmos_proto.field_added_in) = "cosmos-sdk 0.50-inj"];
 }

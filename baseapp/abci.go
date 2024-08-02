@@ -782,12 +782,12 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 			WithHeaderHash(req.Hash))
 	}
 
-	preblockEvents, err := app.preBlock(req)
+	_, err := app.preBlock(req)
 	if err != nil {
 		return nil, err
 	}
 
-	events = append(events, preblockEvents...)
+	events = append(events, app.finalizeBlockState.ctx.EventManager().ABCIEvents()...)
 
 	beginBlock, err := app.beginBlock(req)
 	if err != nil {

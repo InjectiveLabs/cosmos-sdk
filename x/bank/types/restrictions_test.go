@@ -399,7 +399,7 @@ type SendRestrictionArgs struct {
 	Name     string
 	FromAddr sdk.AccAddress
 	ToAddr   sdk.AccAddress
-	Coins    sdk.Coins
+	Coin     sdk.Coin
 }
 
 // SendRestrictionTestHelper is a struct with stuff helpful for testing the SendRestrictionFn stuff.
@@ -412,8 +412,8 @@ func NewSendRestrictionTestHelper() *SendRestrictionTestHelper {
 }
 
 // RecordCall makes note that the provided args were used as a funcion call.
-func (s *SendRestrictionTestHelper) RecordCall(name string, fromAddr, toAddr sdk.AccAddress, coins sdk.Coins) {
-	s.Calls = append(s.Calls, s.NewArgs(name, fromAddr, toAddr, coins))
+func (s *SendRestrictionTestHelper) RecordCall(name string, fromAddr, toAddr sdk.AccAddress, coin sdk.Coin) {
+	s.Calls = append(s.Calls, s.NewArgs(name, fromAddr, toAddr, coin))
 }
 
 // NewCalls is just a shorter way to create a []*SendRestrictionArgs.
@@ -422,35 +422,35 @@ func (s *SendRestrictionTestHelper) NewCalls(args ...*SendRestrictionArgs) []*Se
 }
 
 // NewArgs creates a new SendRestrictionArgs.
-func (s *SendRestrictionTestHelper) NewArgs(name string, fromAddr, toAddr sdk.AccAddress, coins sdk.Coins) *SendRestrictionArgs {
+func (s *SendRestrictionTestHelper) NewArgs(name string, fromAddr, toAddr sdk.AccAddress, coin sdk.Coin) *SendRestrictionArgs {
 	return &SendRestrictionArgs{
 		Name:     name,
 		FromAddr: fromAddr,
 		ToAddr:   toAddr,
-		Coins:    coins,
+		Coin:     coin,
 	}
 }
 
 // NamedRestriction creates a new SendRestrictionFn function that records the arguments it's called with and returns the provided toAddr.
 func (s *SendRestrictionTestHelper) NamedRestriction(name string) types.SendRestrictionFn {
-	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coins) (sdk.AccAddress, error) {
-		s.RecordCall(name, fromAddr, toAddr, coins)
+	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coin sdk.Coin) (sdk.AccAddress, error) {
+		s.RecordCall(name, fromAddr, toAddr, coin)
 		return toAddr, nil
 	}
 }
 
 // NewToRestriction creates a new SendRestrictionFn function that returns a different toAddr than provided.
 func (s *SendRestrictionTestHelper) NewToRestriction(name string, addr sdk.AccAddress) types.SendRestrictionFn {
-	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coins) (sdk.AccAddress, error) {
-		s.RecordCall(name, fromAddr, toAddr, coins)
+	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coin sdk.Coin) (sdk.AccAddress, error) {
+		s.RecordCall(name, fromAddr, toAddr, coin)
 		return addr, nil
 	}
 }
 
 // ErrorRestriction creates a new SendRestrictionFn function that returns a nil toAddr and an error.
 func (s *SendRestrictionTestHelper) ErrorRestriction(message string) types.SendRestrictionFn {
-	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coins) (sdk.AccAddress, error) {
-		s.RecordCall(message, fromAddr, toAddr, coins)
+	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coin sdk.Coin) (sdk.AccAddress, error) {
+		s.RecordCall(message, fromAddr, toAddr, coin)
 		return nil, errors.New(message)
 	}
 }
@@ -464,8 +464,8 @@ type SendRestrictionTestParams struct {
 	FromAddr sdk.AccAddress
 	// ToAddr is the SendRestrictionFn toAddr input.
 	ToAddr sdk.AccAddress
-	// Coins is the SendRestrictionFn coins input.
-	Coins sdk.Coins
+	// Coin is the SendRestrictionFn coin input.
+	Coin sdk.Coin
 	// ExpAddr is the expected return address.
 	ExpAddr sdk.AccAddress
 	// ExpErr is the expected return error string.
@@ -482,7 +482,7 @@ func (s *SendRestrictionTestHelper) TestActual(t *testing.T, tp *SendRestriction
 	} else {
 		require.NotNil(t, actual, "resulting SendRestrictionFn")
 		s.Calls = s.Calls[:0]
-		addr, err := actual(sdk.Context{}, tp.FromAddr, tp.ToAddr, tp.Coins)
+		addr, err := actual(sdk.Context{}, tp.FromAddr, tp.ToAddr, tp.Coin)
 		if len(tp.ExpErr) != 0 {
 			assert.EqualError(t, err, tp.ExpErr, "composite SendRestrictionFn output error")
 		} else {
@@ -500,7 +500,7 @@ func TestSendRestriction_Then(t *testing.T) {
 	addr2 := sdk.AccAddress("2addr_______________")
 	addr3 := sdk.AccAddress("3addr_______________")
 	addr4 := sdk.AccAddress("4addr_______________")
-	coins := sdk.NewCoins(sdk.NewInt64Coin("ecoin", 32), sdk.NewInt64Coin("fcoin", 64))
+	coin := sdk.NewInt64Coin("ecoin", 32)
 
 	h := NewSendRestrictionTestHelper()
 
@@ -525,9 +525,9 @@ func TestSendRestriction_Then(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr1,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr1,
-				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr1, coins)),
+				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr1, coin)),
 			},
 		},
 		{
@@ -537,9 +537,9 @@ func TestSendRestriction_Then(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr1,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr1,
-				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr1, coins)),
+				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr1, coin)),
 			},
 		},
 		{
@@ -549,11 +549,11 @@ func TestSendRestriction_Then(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr1,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr1,
 				ExpCalls: h.NewCalls(
-					h.NewArgs("noop1", fromAddr, addr1, coins),
-					h.NewArgs("noop2", fromAddr, addr1, coins),
+					h.NewArgs("noop1", fromAddr, addr1, coin),
+					h.NewArgs("noop2", fromAddr, addr1, coin),
 				),
 			},
 		},
@@ -564,11 +564,11 @@ func TestSendRestriction_Then(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr1,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr3,
 				ExpCalls: h.NewCalls(
-					h.NewArgs("r1", fromAddr, addr1, coins),
-					h.NewArgs("r2", fromAddr, addr2, coins),
+					h.NewArgs("r1", fromAddr, addr1, coin),
+					h.NewArgs("r2", fromAddr, addr2, coin),
 				),
 			},
 		},
@@ -579,12 +579,12 @@ func TestSendRestriction_Then(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr1,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  nil,
 				ExpErr:   "this is a test error",
 				ExpCalls: h.NewCalls(h.NewArgs(
-					"r1", fromAddr, addr1, coins),
-					h.NewArgs("this is a test error", fromAddr, addr2, coins),
+					"r1", fromAddr, addr1, coin),
+					h.NewArgs("this is a test error", fromAddr, addr2, coin),
 				),
 			},
 		},
@@ -595,10 +595,10 @@ func TestSendRestriction_Then(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr1,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  nil,
 				ExpErr:   "another test error",
-				ExpCalls: h.NewCalls(h.NewArgs("another test error", fromAddr, addr1, coins)),
+				ExpCalls: h.NewCalls(h.NewArgs("another test error", fromAddr, addr1, coin)),
 			},
 		},
 		{
@@ -608,10 +608,10 @@ func TestSendRestriction_Then(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr1,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  nil,
 				ExpErr:   "first test error",
-				ExpCalls: h.NewCalls(h.NewArgs("first test error", fromAddr, addr1, coins)),
+				ExpCalls: h.NewCalls(h.NewArgs("first test error", fromAddr, addr1, coin)),
 			},
 		},
 		{
@@ -621,13 +621,13 @@ func TestSendRestriction_Then(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr0,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr4,
 				ExpCalls: h.NewCalls(
-					h.NewArgs("r1", fromAddr, addr0, coins),
-					h.NewArgs("r2", fromAddr, addr1, coins),
-					h.NewArgs("r3", fromAddr, addr2, coins),
-					h.NewArgs("r4", fromAddr, addr3, coins),
+					h.NewArgs("r1", fromAddr, addr0, coin),
+					h.NewArgs("r2", fromAddr, addr1, coin),
+					h.NewArgs("r3", fromAddr, addr2, coin),
+					h.NewArgs("r4", fromAddr, addr3, coin),
 				),
 			},
 		},
@@ -655,7 +655,7 @@ func TestComposeSendRestrictions(t *testing.T) {
 	addr2 := sdk.AccAddress("2addr_______________")
 	addr3 := sdk.AccAddress("3addr_______________")
 	addr4 := sdk.AccAddress("4addr_______________")
-	coins := sdk.NewCoins(sdk.NewInt64Coin("gcoin", 128), sdk.NewInt64Coin("hcoin", 256))
+	coin := sdk.NewInt64Coin("gcoin", 128)
 
 	h := NewSendRestrictionTestHelper()
 
@@ -698,9 +698,9 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr0,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr0,
-				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr0, coins)),
+				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr0, coin)),
 			},
 		},
 		{
@@ -709,10 +709,10 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr0,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  nil,
 				ExpErr:   "test error",
-				ExpCalls: h.NewCalls(h.NewArgs("test error", fromAddr, addr0, coins)),
+				ExpCalls: h.NewCalls(h.NewArgs("test error", fromAddr, addr0, coin)),
 			},
 		},
 		{
@@ -721,9 +721,9 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr0,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr0,
-				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr0, coins)),
+				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr0, coin)),
 			},
 		},
 		{
@@ -732,9 +732,9 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr1,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr1,
-				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr1, coins)),
+				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr1, coin)),
 			},
 		},
 		{
@@ -743,9 +743,9 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr2,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr2,
-				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr2, coins)),
+				ExpCalls: h.NewCalls(h.NewArgs("noop", fromAddr, addr2, coin)),
 			},
 		},
 		{
@@ -754,11 +754,11 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr0,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr0,
 				ExpCalls: h.NewCalls(
-					h.NewArgs("r1", fromAddr, addr0, coins),
-					h.NewArgs("r2", fromAddr, addr0, coins),
+					h.NewArgs("r1", fromAddr, addr0, coin),
+					h.NewArgs("r2", fromAddr, addr0, coin),
 				),
 			},
 		},
@@ -768,11 +768,11 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr1,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr1,
 				ExpCalls: h.NewCalls(
-					h.NewArgs("r1", fromAddr, addr1, coins),
-					h.NewArgs("r2", fromAddr, addr1, coins),
+					h.NewArgs("r1", fromAddr, addr1, coin),
+					h.NewArgs("r2", fromAddr, addr1, coin),
 				),
 			},
 		},
@@ -782,11 +782,11 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr2,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr2,
 				ExpCalls: h.NewCalls(
-					h.NewArgs("r1", fromAddr, addr2, coins),
-					h.NewArgs("r2", fromAddr, addr2, coins),
+					h.NewArgs("r1", fromAddr, addr2, coin),
+					h.NewArgs("r2", fromAddr, addr2, coin),
 				),
 			},
 		},
@@ -796,12 +796,12 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr3,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  addr3,
 				ExpCalls: h.NewCalls(
-					h.NewArgs("r1", fromAddr, addr3, coins),
-					h.NewArgs("r2", fromAddr, addr3, coins),
-					h.NewArgs("r3", fromAddr, addr3, coins),
+					h.NewArgs("r1", fromAddr, addr3, coin),
+					h.NewArgs("r2", fromAddr, addr3, coin),
+					h.NewArgs("r3", fromAddr, addr3, coin),
 				),
 			},
 		},
@@ -811,10 +811,10 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr4,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  nil,
 				ExpErr:   "first error",
-				ExpCalls: h.NewCalls(h.NewArgs("first error", fromAddr, addr4, coins)),
+				ExpCalls: h.NewCalls(h.NewArgs("first error", fromAddr, addr4, coin)),
 			},
 		},
 		{
@@ -823,12 +823,12 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr4,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  nil,
 				ExpErr:   "second error",
 				ExpCalls: h.NewCalls(
-					h.NewArgs("r1", fromAddr, addr4, coins),
-					h.NewArgs("second error", fromAddr, addr4, coins),
+					h.NewArgs("r1", fromAddr, addr4, coin),
+					h.NewArgs("second error", fromAddr, addr4, coin),
 				),
 			},
 		},
@@ -838,13 +838,13 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr4,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  nil,
 				ExpErr:   "third error",
 				ExpCalls: h.NewCalls(
-					h.NewArgs("r1", fromAddr, addr4, coins),
-					h.NewArgs("r2", fromAddr, addr4, coins),
-					h.NewArgs("third error", fromAddr, addr4, coins),
+					h.NewArgs("r1", fromAddr, addr4, coin),
+					h.NewArgs("r2", fromAddr, addr4, coin),
+					h.NewArgs("third error", fromAddr, addr4, coin),
 				),
 			},
 		},
@@ -854,12 +854,12 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr4,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  nil,
 				ExpErr:   "second error",
 				ExpCalls: h.NewCalls(
-					h.NewArgs("r1", fromAddr, addr4, coins),
-					h.NewArgs("second error", fromAddr, addr0, coins),
+					h.NewArgs("r1", fromAddr, addr4, coin),
+					h.NewArgs("second error", fromAddr, addr0, coin),
 				),
 			},
 		},
@@ -876,19 +876,19 @@ func TestComposeSendRestrictions(t *testing.T) {
 			exp: &SendRestrictionTestParams{
 				FromAddr: fromAddr,
 				ToAddr:   addr0,
-				Coins:    coins,
+				Coin:     coin,
 				ExpAddr:  nil,
 				ExpErr:   "oops, an error",
 				ExpCalls: h.NewCalls(
-					h.NewArgs("r1", fromAddr, addr0, coins),
-					h.NewArgs("r2", fromAddr, addr0, coins),
-					h.NewArgs("r3", fromAddr, addr1, coins),
-					h.NewArgs("r4", fromAddr, addr1, coins),
-					h.NewArgs("r5", fromAddr, addr2, coins),
-					h.NewArgs("r6", fromAddr, addr3, coins),
-					h.NewArgs("r7", fromAddr, addr3, coins),
-					h.NewArgs("r8", fromAddr, addr4, coins),
-					h.NewArgs("oops, an error", fromAddr, addr4, coins),
+					h.NewArgs("r1", fromAddr, addr0, coin),
+					h.NewArgs("r2", fromAddr, addr0, coin),
+					h.NewArgs("r3", fromAddr, addr1, coin),
+					h.NewArgs("r4", fromAddr, addr1, coin),
+					h.NewArgs("r5", fromAddr, addr2, coin),
+					h.NewArgs("r6", fromAddr, addr3, coin),
+					h.NewArgs("r7", fromAddr, addr3, coin),
+					h.NewArgs("r8", fromAddr, addr4, coin),
+					h.NewArgs("oops, an error", fromAddr, addr4, coin),
 				),
 			},
 		},
@@ -911,7 +911,7 @@ func TestNoOpSendRestrictionFn(t *testing.T) {
 	var addr sdk.AccAddress
 	var err error
 	testFunc := func() {
-		addr, err = types.NoOpSendRestrictionFn(sdk.Context{}, sdk.AccAddress("first_addr"), expAddr, sdk.Coins{})
+		addr, err = types.NoOpSendRestrictionFn(sdk.Context{}, sdk.AccAddress("first_addr"), expAddr, sdk.Coin{})
 	}
 	require.NotPanics(t, testFunc, "NoOpSendRestrictionFn")
 	assert.NoError(t, err, "NoOpSendRestrictionFn error")

@@ -2,11 +2,11 @@ package types
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	"github.com/cosmos/gogoproto/proto"
 
 	"cosmossdk.io/core/comet"
 	"cosmossdk.io/core/header"
@@ -65,6 +65,17 @@ type Context struct {
 	streamingManager     storetypes.StreamingManager
 	cometInfo            comet.BlockInfo
 	headerInfo           header.Info
+
+	// the index of the current tx in the block, -1 means not in finalize block context
+	txIndex int
+	// the index of the current msg in the tx, -1 means not in finalize block context
+	msgIndex int
+	// the total number of transactions in current block
+	txCount int
+	// sum the gas used by all the transactions in the current block, only accessible by end blocker
+	blockGasUsed uint64
+	// sum the gas wanted by all the transactions in the current block, only accessible by end blocker
+	blockGasWanted uint64
 }
 
 // Proposed rename, not done to avoid API breakage
@@ -93,11 +104,15 @@ func (c Context) TransientKVGasConfig() storetypes.GasConfig    { return c.trans
 func (c Context) StreamingManager() storetypes.StreamingManager { return c.streamingManager }
 func (c Context) CometInfo() comet.BlockInfo                    { return c.cometInfo }
 func (c Context) HeaderInfo() header.Info                       { return c.headerInfo }
+func (c Context) TxIndex() int                                  { return c.txIndex }
+func (c Context) MsgIndex() int                                 { return c.msgIndex }
+func (c Context) TxCount() int                                  { return c.txCount }
+func (c Context) BlockGasUsed() uint64                          { return c.blockGasUsed }
+func (c Context) BlockGasWanted() uint64                        { return c.blockGasWanted }
 
-// clone the header before returning
+// BlockHeader returns the header by value (shallow copy).
 func (c Context) BlockHeader() cmtproto.Header {
-	msg := proto.Clone(&c.header).(*cmtproto.Header)
-	return *msg
+	return c.header
 }
 
 // HeaderHash returns a copy of the header hash obtained during abci.RequestBeginBlock
@@ -140,6 +155,8 @@ func NewContext(ms storetypes.MultiStore, header cmtproto.Header, isCheckTx bool
 		eventManager:         NewEventManager(),
 		kvGasConfig:          storetypes.KVGasConfig(),
 		transientKVGasConfig: storetypes.TransientGasConfig(),
+		txIndex:              -1,
+		msgIndex:             -1,
 	}
 }
 
@@ -319,6 +336,31 @@ func (c Context) WithHeaderInfo(headerInfo header.Info) Context {
 	return c
 }
 
+func (c Context) WithTxIndex(txIndex int) Context {
+	c.txIndex = txIndex
+	return c
+}
+
+func (c Context) WithTxCount(txCount int) Context {
+	c.txCount = txCount
+	return c
+}
+
+func (c Context) WithMsgIndex(msgIndex int) Context {
+	c.msgIndex = msgIndex
+	return c
+}
+
+func (c Context) WithBlockGasUsed(gasUsed uint64) Context {
+	c.blockGasUsed = gasUsed
+	return c
+}
+
+func (c Context) WithBlockGasWanted(gasWanted uint64) Context {
+	c.blockGasWanted = gasWanted
+	return c
+}
+
 // TODO: remove???
 func (c Context) IsZero() bool {
 	return c.ms == nil
@@ -351,6 +393,11 @@ func (c Context) TransientStore(key storetypes.StoreKey) storetypes.KVStore {
 	return gaskv.NewStore(c.ms.GetKVStore(key), c.gasMeter, c.transientKVGasConfig)
 }
 
+// ObjectStore fetches an object store from the MultiStore,
+func (c Context) ObjectStore(key storetypes.StoreKey) storetypes.ObjKVStore {
+	return gaskv.NewObjStore(c.ms.GetObjKVStore(key), c.gasMeter, c.transientKVGasConfig)
+}
+
 // CacheContext returns a new Context with the multi-store cached and a new
 // EventManager. The cached context is written to the context when writeCache
 // is called. Note, events are automatically emitted on the parent context's
@@ -365,6 +412,26 @@ func (c Context) CacheContext() (cc Context, writeCache func()) {
 	}
 
 	return cc, writeCache
+}
+
+// RunAtomic execute the callback function atomically, i.e. the state and event changes are
+// only persisted if the callback returns no error, or discarded as a whole.
+// It uses an efficient approach than CacheContext, without wrapping stores.
+func (c Context) RunAtomic(cb func(Context) error) error {
+	evtManager := NewEventManager()
+	cacheMS, ok := c.ms.(storetypes.CacheMultiStore)
+	if !ok {
+		return errors.New("multistore is not a CacheMultiStore")
+	}
+	if err := cacheMS.RunAtomic(func(ms storetypes.CacheMultiStore) error {
+		ctx := c.WithMultiStore(ms).WithEventManager(evtManager)
+		return cb(ctx)
+	}); err != nil {
+		return err
+	}
+
+	c.EventManager().EmitEvents(evtManager.Events())
+	return nil
 }
 
 var (

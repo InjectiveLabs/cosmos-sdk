@@ -16,6 +16,7 @@ import (
 	corestore "cosmossdk.io/core/store"
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
+	storetypes "cosmossdk.io/store/types"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -43,7 +44,8 @@ var (
 	_ module.HasServices         = AppModule{}
 	_ module.HasInvariants       = AppModule{}
 
-	_ appmodule.AppModule = AppModule{}
+	_ appmodule.AppModule     = AppModule{}
+	_ appmodule.HasEndBlocker = AppModule{}
 )
 
 // AppModuleBasic defines the basic application module used by the bank module.
@@ -222,6 +224,7 @@ type ModuleInputs struct {
 	StoreService  corestore.KVStoreService
 	TStoreService corestore.TransientStoreService
 	Logger        log.Logger
+	ObjStoreKey   *storetypes.ObjectStoreKey
 
 	AccountKeeper types.AccountKeeper
 
@@ -262,6 +265,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.Cdc,
 		in.StoreService,
 		in.TStoreService,
+		in.ObjStoreKey,
 		in.AccountKeeper,
 		blockedAddresses,
 		authority.String(),

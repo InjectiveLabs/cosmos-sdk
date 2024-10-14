@@ -8,4 +8,5 @@ import (
 // EndBlocker is called every block, emits balance event
 func EndBlocker(ctx sdk.Context, k keeper.Keeper) {
 	k.EmitAllTransientBalances(ctx)
+	k.CreditVirtualAccounts(ctx)
 }

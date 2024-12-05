@@ -748,42 +748,85 @@ func (app *BaseApp) beginBlock(_ *abci.FinalizeBlockRequest) (sdk.BeginBlock, er
 	return resp, nil
 }
 
+import (
+    "time"
+    "encoding/json"
+)
+
+import (
+    "time"
+    "encoding/json"
+)
+
+
 func (app *BaseApp) deliverTx(tx []byte) *abci.ExecTxResult {
-	gInfo := sdk.GasInfo{}
-	resultStr := "successful"
+    // Helper function to get current UNIX timestamp in UTC
+    getTimestamp := func() int64 {
+        return time.Now().UTC().Unix()
+    }
 
-	var resp *abci.ExecTxResult
+    gInfo := sdk.GasInfo{}
+    resultStr := "successful"
 
-	defer func() {
-		telemetry.IncrCounter(1, "tx", "count")
-		telemetry.IncrCounter(1, "tx", resultStr)
-		telemetry.SetGauge(float32(gInfo.GasUsed), "tx", "gas", "used")
-		telemetry.SetGauge(float32(gInfo.GasWanted), "tx", "gas", "wanted")
-	}()
+    var resp *abci.ExecTxResult
 
-	gInfo, result, anteEvents, err := app.runTx(execModeFinalize, tx)
-	if err != nil {
-		resultStr = "failed"
-		resp = sdkerrors.ResponseExecTxResultWithEvents(
-			err,
-			gInfo.GasWanted,
-			gInfo.GasUsed,
-			sdk.MarkEventsToIndex(anteEvents, app.indexEvents),
-			app.trace,
-		)
-		return resp
-	}
+    // Log the received transaction with timestamp at CRITICAL level
+    app.logger.Error("CRITICAL: Received transaction",
+        "timestamp", getTimestamp(),
+        "txBytes", fmt.Sprintf("%X", tx))
 
-	resp = &abci.ExecTxResult{
-		GasWanted: int64(gInfo.GasWanted),
-		GasUsed:   int64(gInfo.GasUsed),
-		Log:       result.Log,
-		Data:      result.Data,
-		Events:    sdk.MarkEventsToIndex(result.Events, app.indexEvents),
-	}
+    defer func() {
+        telemetry.IncrCounter(1, "tx", "count")
+        telemetry.IncrCounter(1, "tx", resultStr)
+        telemetry.SetGauge(float32(gInfo.GasUsed), "tx", "gas", "used")
+        telemetry.SetGauge(float32(gInfo.GasWanted), "tx", "gas", "wanted")
+    }()
 
-	return resp
+    // Log start of transaction execution with timestamp at CRITICAL level
+    app.logger.Error("CRITICAL: Starting transaction execution",
+        "timestamp", getTimestamp())
+
+    // Execute the transaction
+    gInfo, result, anteEvents, err := app.runTx(execModeFinalize, tx, nil)
+    if err != nil {
+        resultStr = "failed"
+
+        // Log transaction failure with timestamp and error details at CRITICAL level
+        app.logger.Error("CRITICAL: Transaction execution failed",
+            "timestamp", getTimestamp(),
+            "err", err,
+            "gasWanted", gInfo.GasWanted,
+            "gasUsed", gInfo.GasUsed)
+
+        resp = responseExecTxResultWithEvents(
+            err,
+            gInfo.GasWanted,
+            gInfo.GasUsed,
+            sdk.MarkEventsToIndex(anteEvents, app.indexEvents),
+            app.trace,
+        )
+        return resp
+    }
+
+    // Log transaction success with gas information and timestamp at CRITICAL level
+    app.logger.Error("CRITICAL: Transaction executed successfully",
+        "timestamp", getTimestamp(),
+        "gasWanted", gInfo.GasWanted,
+        "gasUsed", gInfo.GasUsed,
+        "resultData", fmt.Sprintf("%X", result.Data),
+        "resultLog", result.Log)
+
+    resp = &abci.ExecTxResult{
+        GasWanted: int64(gInfo.GasWanted),
+        GasUsed:   int64(gInfo.GasUsed),
+        Log:       result.Log,
+        Data:      result.Data,
+        Events:    sdk.MarkEventsToIndex(result.Events, app.indexEvents),
+    }
+
+    return resp
 }
+
 
 // endBlock is an application-defined function that is called after transactions
 // have been processed in FinalizeBlock.

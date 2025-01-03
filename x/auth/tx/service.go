@@ -224,8 +224,9 @@ func (s txServer) BroadcastTx(ctx context.Context, req *txtypes.BroadcastTxReque
 // BroadcastTxWithWrappedError implements the ServiceServer.BroadcastTx RPC method and returns a GRPC wrapped error if any.
 func (s txServer) BroadcastTxWithWrappedError(ctx context.Context, req *txtypes.BroadcastTxRequest) (*txtypes.BroadcastTxResponse, error) {
 	res, err := client.TxServiceBroadcast(ctx, s.clientCtx, req)
+	
 	if err != nil {
-		return nil, sdkerrors.GRPCWrap(err, codes.Unknown, "failed to broadcast transaction")
+		return nil, sdkerrors.GRPCWrap(err, codes.Unknown, fmt.Sprintf("%v With gas wanted: '%d' and gas used: '%d' ", err, res.TxResponse.GasWanted, res.TxResponse.GasUsed))
 	}
 
 	return res, nil

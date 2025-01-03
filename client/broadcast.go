@@ -93,7 +93,7 @@ func (ctx Context) BroadcastTxSync(txBytes []byte) (*sdk.TxResponse, error) {
 
 	res, err := node.BroadcastTxSync(context.Background(), txBytes)
 	if errRes := CheckCometError(err, txBytes); errRes != nil {
-		return errRes, nil
+		return errRes, sdkerrors.GRPCWrap(err, codes.Unknown, fmt.Sprintf("%v With gas wanted: '%d' and gas used: '%d' ", err, errRes.GasWanted, errRes.GasUsed))
 	}
 
 	return sdk.NewResponseFormatBroadcastTx(res), err
@@ -109,7 +109,7 @@ func (ctx Context) BroadcastTxAsync(txBytes []byte) (*sdk.TxResponse, error) {
 
 	res, err := node.BroadcastTxAsync(context.Background(), txBytes)
 	if errRes := CheckCometError(err, txBytes); errRes != nil {
-		return errRes, nil
+		return errRes, sdkerrors.GRPCWrap(err, codes.Unknown, fmt.Sprintf("%v With gas wanted: '%d' and gas used: '%d' ", err, errRes.GasWanted, errRes.GasUsed))
 	}
 
 	return sdk.NewResponseFormatBroadcastTx(res), err

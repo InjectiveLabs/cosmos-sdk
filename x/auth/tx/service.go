@@ -221,6 +221,16 @@ func (s txServer) BroadcastTx(ctx context.Context, req *txtypes.BroadcastTxReque
 	return client.TxServiceBroadcast(ctx, s.clientCtx, req)
 }
 
+// BroadcastTx implements the ServiceServer.BroadcastTx RPC method.
+func (s txServer) BroadcastTxWithWrappedError(ctx context.Context, req *txtypes.BroadcastTxRequest) (*txtypes.BroadcastTxResponse, error) {
+	res, err := client.TxServiceBroadcast(ctx, s.clientCtx, req)
+	if err != nil {
+		return nil, sdkerrors.GRPCWrap(err, codes.Unknown, "failed to broadcast transaction")
+	}
+
+	return res, nil
+}
+
 // TxEncode implements the ServiceServer.TxEncode RPC method.
 func (s txServer) TxEncode(ctx context.Context, req *txtypes.TxEncodeRequest) (*txtypes.TxEncodeResponse, error) {
 	if req.Tx == nil {

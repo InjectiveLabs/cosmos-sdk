@@ -793,6 +793,10 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 
 	events = append(events, preblockEvents...)
 
+	if app.getCtxFunc != nil {
+		app.finalizeBlockState.SetContext(app.getCtxFunc(app.finalizeBlockState.Context()))
+	}
+
 	beginBlock, err := app.beginBlock(req)
 	if err != nil {
 		return nil, err

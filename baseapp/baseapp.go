@@ -208,6 +208,9 @@ type BaseApp struct {
 
 	// Optional alternative tx executor, used for block-stm parallel transaction execution.
 	txExecutor TxExecutor
+
+	// Optional alternative to set an sdk context on the BaseApp
+	getCtxFunc func(ctx sdk.Context) sdk.Context
 }
 
 // NewBaseApp returns a reference to an initialized BaseApp. It accepts a
@@ -754,6 +757,11 @@ func (app *BaseApp) preBlock(req *abci.RequestFinalizeBlock) ([]abci.Event, erro
 		}
 	}
 	return events, nil
+}
+
+// Set the context getter function on the BaseApp
+func (app *BaseApp) SetGetCtxFunc(getCtxFunc func(ctx sdk.Context) sdk.Context) {
+	app.getCtxFunc = getCtxFunc
 }
 
 func (app *BaseApp) beginBlock(_ *abci.RequestFinalizeBlock) (sdk.BeginBlock, error) {

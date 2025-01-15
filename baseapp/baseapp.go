@@ -188,6 +188,10 @@ type BaseApp struct {
 	// including the goroutine handling.This is experimental and must be enabled
 	// by developers.
 	optimisticExec *oe.OptimisticExecution
+
+	// StreamEvents
+	EnableStreamer bool
+	StreamEvents   chan StreamEvents
 }
 
 // NewBaseApp returns a reference to an initialized BaseApp. It accepts a
@@ -208,6 +212,7 @@ func NewBaseApp(
 		fauxMerkleMode:   false,
 		sigverifyTx:      true,
 		queryGasLimit:    math.MaxUint64,
+		StreamEvents:     make(chan StreamEvents),
 	}
 
 	for _, option := range options {
@@ -747,6 +752,8 @@ func (app *BaseApp) beginBlock(_ *abci.FinalizeBlockRequest) (sdk.BeginBlock, er
 			)
 		}
 
+		ctx := app.finalizeBlockState.ctx
+		app.AddStreamEvents(ctx.BlockHeight(), ctx.BlockTime(), resp.Events, false)
 		resp.Events = sdk.MarkEventsToIndex(resp.Events, app.indexEvents)
 	}
 
@@ -779,6 +786,9 @@ func (app *BaseApp) deliverTx(tx []byte) *abci.ExecTxResult {
 		return resp
 	}
 
+	ctx := app.checkState.Context()
+	app.AddStreamEvents(ctx.BlockHeight(), ctx.BlockTime(), result.Events, false)
+
 	resp = &abci.ExecTxResult{
 		GasWanted: int64(gInfo.GasWanted),
 		GasUsed:   int64(gInfo.GasUsed),
@@ -809,6 +819,9 @@ func (app *BaseApp) endBlock(_ context.Context) (sdk.EndBlock, error) {
 				abci.EventAttribute{Key: "event_index", Value: strconv.Itoa(i)},
 			)
 		}
+
+		ctx := app.finalizeBlockState.ctx
+		app.AddStreamEvents(ctx.BlockHeight(), ctx.BlockTime(), eb.Events, true)
 
 		eb.Events = sdk.MarkEventsToIndex(eb.Events, app.indexEvents)
 		endblock = eb

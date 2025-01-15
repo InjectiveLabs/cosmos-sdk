@@ -16,6 +16,7 @@ func RegisterLegacyAminoCodec(registrar registry.AminoRegistrar) {
 	legacy.RegisterAminoMsg(registrar, &MsgGrant{}, "cosmos-sdk/MsgGrant")
 	legacy.RegisterAminoMsg(registrar, &MsgRevoke{}, "cosmos-sdk/MsgRevoke")
 	legacy.RegisterAminoMsg(registrar, &MsgExec{}, "cosmos-sdk/MsgExec")
+	legacy.RegisterAminoMsg(registrar, &MsgExecCompat{}, "cosmos-sdk/MsgExecCompat")
 
 	registrar.RegisterInterface((*Authorization)(nil), nil)
 	registrar.RegisterConcrete(&GenericAuthorization{}, "cosmos-sdk/GenericAuthorization")
@@ -27,6 +28,7 @@ func RegisterInterfaces(registrar registry.InterfaceRegistrar) {
 		&MsgGrant{},
 		&MsgRevoke{},
 		&MsgExec{},
+		&MsgExecCompat{},
 	)
 
 	// since bank.SendAuthorization and staking.StakeAuthorization both implement Authorization

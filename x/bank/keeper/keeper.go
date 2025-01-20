@@ -6,6 +6,7 @@ import (
 
 	"cosmossdk.io/core/appmodule"
 	"cosmossdk.io/core/event"
+	"cosmossdk.io/core/store"
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/math"
 	"cosmossdk.io/x/bank/types"
@@ -49,6 +50,8 @@ type Keeper interface {
 	DelegateCoins(ctx context.Context, delegatorAddr, moduleAccAddr sdk.AccAddress, amt sdk.Coins) error
 	UndelegateCoins(ctx context.Context, moduleAccAddr, delegatorAddr sdk.AccAddress, amt sdk.Coins) error
 
+	EmitAllTransientBalances(ctx sdk.Context)
+
 	types.QueryServer
 }
 
@@ -84,6 +87,7 @@ func NewBaseKeeper(
 	env appmodule.Environment,
 	cdc codec.BinaryCodec,
 	ak types.AccountKeeper,
+	tStoreService store.TransientStoreService,
 	blockedAddrs map[string]bool,
 	authority string,
 ) BaseKeeper {
@@ -93,7 +97,7 @@ func NewBaseKeeper(
 
 	return BaseKeeper{
 		Environment:            env,
-		BaseSendKeeper:         NewBaseSendKeeper(env, cdc, ak, blockedAddrs, authority),
+		BaseSendKeeper:         NewBaseSendKeeper(env, cdc, ak, tStoreService, blockedAddrs, authority),
 		ak:                     ak,
 		cdc:                    cdc,
 		mintCoinsRestrictionFn: types.NoOpMintingRestrictionFn,

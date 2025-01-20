@@ -7,6 +7,7 @@ import (
 	"cosmossdk.io/collections"
 	"cosmossdk.io/core/appmodule"
 	"cosmossdk.io/core/event"
+	"cosmossdk.io/core/store"
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/math"
 	"cosmossdk.io/x/bank/types"
@@ -73,6 +74,7 @@ func NewBaseSendKeeper(
 	env appmodule.Environment,
 	cdc codec.BinaryCodec,
 	ak types.AccountKeeper,
+	tStoreService store.TransientStoreService,
 	blockedAddrs map[string]bool,
 	authority string,
 ) BaseSendKeeper {
@@ -82,7 +84,7 @@ func NewBaseSendKeeper(
 
 	return BaseSendKeeper{
 		Environment:     env,
-		BaseViewKeeper:  NewBaseViewKeeper(env, cdc, ak),
+		BaseViewKeeper:  NewBaseViewKeeper(env, cdc, ak, tStoreService),
 		cdc:             cdc,
 		ak:              ak,
 		blockedAddrs:    blockedAddrs,
@@ -323,12 +325,21 @@ func (k BaseSendKeeper) setBalance(ctx context.Context, addr sdk.AccAddress, bal
 
 	// x/bank invariants prohibit persistence of zero balances
 	if balance.IsZero() {
-		err := k.Balances.Remove(ctx, collections.Join(addr, balance.Denom))
+		// set transient balance which will be emitted in the Endblocker
+		err := k.setTransientBalance(sdk.UnwrapSDKContext(ctx), addr, balance)
 		if err != nil {
 			return err
 		}
-		return nil
+
+		return k.Balances.Remove(ctx, collections.Join(addr, balance.Denom))
 	}
+
+	// set transient balance which will be emitted in the Endblocker
+	err := k.setTransientBalance(sdk.UnwrapSDKContext(ctx), addr, balance)
+	if err != nil {
+		return err
+	}
+
 	return k.Balances.Set(ctx, collections.Join(addr, balance.Denom), balance.Amount)
 }
 

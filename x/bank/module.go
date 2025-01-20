@@ -150,6 +150,17 @@ func (am AppModule) ExportGenesis(ctx context.Context) (json.RawMessage, error) 
 // ConsensusVersion implements HasConsensusVersion
 func (AppModule) ConsensusVersion() uint64 { return ConsensusVersion }
 
+// BeginBlock returns the begin blocker for the bank module.
+func (am AppModule) BeginBlock(ctx context.Context) {
+}
+
+// EndBlock returns the end blocker for the bank module. It returns no validator
+// updates.
+func (am AppModule) EndBlock(ctx context.Context) error {
+	EndBlocker(ctx, am.keeper)
+	return nil
+}
+
 // AppModuleSimulation functions
 
 // GenerateGenesisState creates a randomized GenState of the bank module.

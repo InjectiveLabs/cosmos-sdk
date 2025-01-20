@@ -13,6 +13,7 @@ import (
 	"cosmossdk.io/x/bank/keeper"
 	"cosmossdk.io/x/bank/types"
 
+	"cosmossdk.io/core/store"
 	"github.com/cosmos/cosmos-sdk/codec"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
@@ -33,9 +34,10 @@ func init() {
 type ModuleInputs struct {
 	depinject.In
 
-	Config      *modulev1.Module
-	Cdc         codec.Codec
-	Environment appmodule.Environment
+	Config                *modulev1.Module
+	Cdc                   codec.Codec
+	Environment           appmodule.Environment
+	TransientStoreService store.TransientStoreService
 
 	AccountKeeper types.AccountKeeper
 }
@@ -86,6 +88,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.Environment,
 		in.Cdc,
 		in.AccountKeeper,
+		in.TransientStoreService,
 		blockedAddresses,
 		authStr,
 	)

@@ -115,6 +115,7 @@ func TestFundsMigration(t *testing.T) {
 		runtime.NewEnvironment(runtime.NewKVStoreService(keys[banktypes.StoreKey]), log.NewNopLogger()),
 		encCfg.Codec,
 		accountKeeper,
+		runtime.NewTransientStoreService(storetypes.NewTransientStoreKey("transient_test")),
 		map[string]bool{},
 		authority,
 	)

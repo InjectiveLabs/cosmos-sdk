@@ -171,6 +171,7 @@ func (suite *KeeperTestSuite) SetupTest() {
 		env,
 		encCfg.Codec,
 		suite.authKeeper,
+		runtime.NewTransientStoreService(storetypes.NewTransientStoreKey("transient_test")),
 		map[string]bool{addr: true},
 		authority,
 	)
@@ -337,6 +338,7 @@ func (suite *KeeperTestSuite) TestGetAuthority() {
 			env,
 			moduletestutil.MakeTestEncodingConfig(codectestutil.CodecOptions{}).Codec,
 			suite.authKeeper,
+			runtime.NewTransientStoreService(storetypes.NewTransientStoreKey("transient_test")),
 			nil,
 			authority,
 		)

@@ -7,6 +7,7 @@ import (
 	"cosmossdk.io/collections"
 	"cosmossdk.io/collections/indexes"
 	"cosmossdk.io/core/appmodule"
+	"cosmossdk.io/core/store"
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/math"
 	"cosmossdk.io/x/bank/types"
@@ -57,8 +58,9 @@ func (b BalancesIndexes) IndexesList() []collections.Index[collections.Pair[sdk.
 type BaseViewKeeper struct {
 	appmodule.Environment
 
-	cdc codec.BinaryCodec
-	ak  types.AccountKeeper
+	cdc           codec.BinaryCodec
+	ak            types.AccountKeeper
+	tStoreService store.TransientStoreService
 
 	Schema        collections.Schema
 	Supply        collections.Map[string, math.Int]
@@ -69,12 +71,13 @@ type BaseViewKeeper struct {
 }
 
 // NewBaseViewKeeper returns a new BaseViewKeeper.
-func NewBaseViewKeeper(env appmodule.Environment, cdc codec.BinaryCodec, ak types.AccountKeeper) BaseViewKeeper {
+func NewBaseViewKeeper(env appmodule.Environment, cdc codec.BinaryCodec, ak types.AccountKeeper, tStoreService store.TransientStoreService) BaseViewKeeper {
 	sb := collections.NewSchemaBuilder(env.KVStoreService)
 	k := BaseViewKeeper{
 		Environment:   env,
 		cdc:           cdc,
 		ak:            ak,
+		tStoreService: tStoreService,
 		Supply:        collections.NewMap(sb, types.SupplyKey, "supply", collections.StringKey.WithName("denom"), sdk.IntValue),
 		DenomMetadata: collections.NewMap(sb, types.DenomMetadataPrefix, "denom_metadata", collections.StringKey.WithName("denom"), codec.CollValue[types.Metadata](cdc)),
 		SendEnabled:   collections.NewMap(sb, types.SendEnabledPrefix, "send_enabled", collections.StringKey.WithName("denom"), codec.BoolValue), // NOTE: we use a bool value which uses protobuf to retain state backwards compat

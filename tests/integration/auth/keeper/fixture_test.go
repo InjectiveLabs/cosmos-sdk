@@ -101,6 +101,7 @@ func initFixture(t *testing.T, extraAccs map[string]accountstd.Interface) *fixtu
 		runtime.NewEnvironment(runtime.NewKVStoreService(keys[banktypes.StoreKey]), log.NewNopLogger()),
 		cdc,
 		authKeeper,
+		runtime.NewTransientStoreService(storetypes.NewTransientStoreKey("transient_test")),
 		blockedAddresses,
 		authority.String(),
 	)

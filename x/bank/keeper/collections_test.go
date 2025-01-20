@@ -48,6 +48,7 @@ func TestBankStateCompatibility(t *testing.T) {
 		env,
 		encCfg.Codec,
 		authKeeper,
+		runtime.NewTransientStoreService(storetypes.NewTransientStoreKey("transient_test")),
 		map[string]bool{addr: true},
 		authority,
 	)

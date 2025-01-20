@@ -120,6 +120,7 @@ func initFixture(t *testing.T) *fixture {
 		runtime.NewEnvironment(runtime.NewKVStoreService(keys[banktypes.StoreKey]), log.NewNopLogger()),
 		cdc,
 		accountKeeper,
+		runtime.NewTransientStoreService(storetypes.NewTransientStoreKey("transient_test")),
 		blockedAddresses,
 		authority.String(),
 	)

@@ -40,7 +40,7 @@ func NewDeductFeeDecorator(ak AccountKeeper, bk types.BankKeeper, fk FeegrantKee
 	}
 
 	if tfc == nil {
-		dfd.txFeeChecker = dfd.checkTxFeeWithValidatorMinGasPrices
+		dfd.txFeeChecker = dfd.CheckTxFeeWithValidatorMinGasPrices
 	}
 
 	return dfd

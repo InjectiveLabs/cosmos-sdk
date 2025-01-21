@@ -12,9 +12,9 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
-// checkTxFeeWithValidatorMinGasPrices implements the default fee logic, where the minimum price per
+// CheckTxFeeWithValidatorMinGasPrices implements the default fee logic, where the minimum price per
 // unit of gas is fixed and set by each validator, can the tx priority is computed from the gas price.
-func (dfd *DeductFeeDecorator) checkTxFeeWithValidatorMinGasPrices(ctx context.Context, tx transaction.Tx) (sdk.Coins, int64, error) {
+func (dfd *DeductFeeDecorator) CheckTxFeeWithValidatorMinGasPrices(ctx context.Context, tx transaction.Tx) (sdk.Coins, int64, error) {
 	feeTx, ok := tx.(sdk.FeeTx)
 	if !ok {
 		return nil, 0, errorsmod.Wrap(sdkerrors.ErrTxDecode, "Tx must be a FeeTx")

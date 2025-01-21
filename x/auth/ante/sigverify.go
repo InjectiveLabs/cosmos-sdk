@@ -1,6 +1,7 @@
 package ante
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
@@ -205,8 +206,10 @@ func (svd SigVerificationDecorator) ValidateTx(ctx context.Context, tx transacti
 		return errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "invalid number of pubkeys; expected %d, got %d", len(signers), len(pubKeys))
 	}
 
+	hasMultipleSigners := len(signers) > 1
+
 	for i := range signers {
-		err = svd.authenticate(ctx, sigTx, signers[i], signatures[i], pubKeys[i], i)
+		err = svd.authenticate(ctx, sigTx, signers[i], signatures[i], pubKeys[i], i, hasMultipleSigners)
 		if err != nil {
 			return err
 		}
@@ -241,7 +244,7 @@ func (svd SigVerificationDecorator) ValidateTx(ctx context.Context, tx transacti
 }
 
 // authenticate the authentication of the TX for a specific tx signer.
-func (svd SigVerificationDecorator) authenticate(ctx context.Context, tx authsigning.Tx, signer []byte, sig signing.SignatureV2, txPubKey cryptotypes.PubKey, signerIndex int) error {
+func (svd SigVerificationDecorator) authenticate(ctx context.Context, tx authsigning.Tx, signer []byte, sig signing.SignatureV2, txPubKey cryptotypes.PubKey, signerIndex int, hasMultipleSigners bool) error {
 	// first we check if it's an AA
 	if svd.aaKeeper != nil {
 		isAa, err := svd.aaKeeper.IsAbstractedAccount(ctx, signer)
@@ -251,6 +254,13 @@ func (svd SigVerificationDecorator) authenticate(ctx context.Context, tx authsig
 		if isAa {
 			return svd.authenticateAbstractedAccount(ctx, tx, signer, signerIndex)
 		}
+	}
+
+	feeTx, isFeeTx := tx.(sdk.FeeTx)
+
+	// skip sequence increment of fee payer, when multiple signers exist
+	if isFeeTx && hasMultipleSigners && bytes.Equal(feeTx.FeePayer(), signer) {
+		return nil
 	}
 
 	// not an AA, proceed with standard auth flow.

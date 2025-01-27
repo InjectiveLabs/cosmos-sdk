@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/InjectiveLabs/metrics"
 	abci "github.com/cometbft/cometbft/api/cometbft/abci/v1"
 	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	"github.com/cometbft/cometbft/crypto/tmhash"
@@ -192,6 +193,8 @@ type BaseApp struct {
 	// StreamEvents
 	EnableStreamer bool
 	StreamEvents   chan StreamEvents
+
+	traceFlightRecorder *metrics.TraceRecorder
 }
 
 // NewBaseApp returns a reference to an initialized BaseApp. It accepts a

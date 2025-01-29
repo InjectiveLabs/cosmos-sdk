@@ -19,7 +19,7 @@ const (
 	GasFlagAuto          = "auto"
 
 	// DefaultKeyringBackend defines the default keyring backend to be used
-	DefaultKeyringBackend = keyring.BackendOS
+	DefaultKeyringBackend = keyring.BackendFile
 
 	// BroadcastSync defines a tx broadcasting mode where the client waits for
 	// a CheckTx execution response only.

@@ -14,6 +14,7 @@ import (
 	"cosmossdk.io/x/gov/types"
 	v1 "cosmossdk.io/x/gov/types/v1"
 
+	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/telemetry"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -198,7 +199,8 @@ func (k Keeper) EndBlocker(ctx context.Context) error {
 			_, err = k.BranchService.ExecuteWithGasLimit(ctx, params.ProposalExecutionGas, func(ctx context.Context) error {
 				// execute all messages
 				for idx, msg = range messages {
-					if _, err := safeExecuteHandler(ctx, msg, k.MsgRouterService); err != nil {
+					execCtx := sdk.UnwrapSDKContext(ctx).WithValue(baseapp.DoNotFailFastSendContextKey, nil) // enable fail fast during msg handling
+					if _, err := safeExecuteHandler(execCtx, msg, k.MsgRouterService); err != nil {
 						return err
 					}
 				}

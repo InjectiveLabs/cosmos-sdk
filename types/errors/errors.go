@@ -3,11 +3,12 @@ package errors
 import (
 	"fmt"
 
-	errorsmod "cosmossdk.io/errors"
 	"github.com/pkg/errors"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	errorsmod "cosmossdk.io/errors"
 )
 
 // RootCodespace is the codespace for all errors defined in this package

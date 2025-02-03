@@ -675,9 +675,9 @@ func SignWithLedger(k *Record, msg []byte, signMode signing.SignMode) (sig []byt
 	}
 
 	// moved to injective-core as part of Ledger signing (PR #1557)
-	//if !priv.PubKey().VerifySignature(msg, sig) {
-	//	return nil, nil, ErrLedgerInvalidSignature
-	//}
+	// if !priv.PubKey().VerifySignature(msg, sig) {
+	// 	return nil, nil, ErrLedgerInvalidSignature
+	// }
 
 	return sig, priv.PubKey(), nil
 }

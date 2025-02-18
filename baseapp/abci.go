@@ -11,7 +11,7 @@ import (
 	"github.com/InjectiveLabs/metrics"
 	"github.com/cockroachdb/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
-	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	"github.com/cosmos/gogoproto/proto"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"

@@ -111,9 +111,9 @@ func updateValidators(
 	return current
 }
 
-// RandomRequestFinalizeBlock generates a list of signing validators according to
+// RandomFinalizeBlockRequest generates a list of signing validators according to
 // the provided list of validators, signing fraction, and evidence fraction
-func RandomRequestFinalizeBlock(
+func RandomFinalizeBlockRequest(
 	r *rand.Rand,
 	params Params,
 	validators mockValidators,
@@ -123,9 +123,9 @@ func RandomRequestFinalizeBlock(
 	blockHeight int64,
 	time time.Time,
 	proposer []byte,
-) *abci.RequestFinalizeBlock {
+) *abci.FinalizeBlockRequest {
 	if len(validators) == 0 {
-		return &abci.RequestFinalizeBlock{
+		return &abci.FinalizeBlockRequest{
 			Height:          blockHeight,
 			Time:            time,
 			ProposerAddress: proposer,
@@ -171,7 +171,7 @@ func RandomRequestFinalizeBlock(
 
 	// return if no past times
 	if len(pastTimes) == 0 {
-		return &abci.RequestFinalizeBlock{
+		return &abci.FinalizeBlockRequest{
 			Height:          blockHeight,
 			Time:            time,
 			ProposerAddress: proposer,
@@ -215,7 +215,7 @@ func RandomRequestFinalizeBlock(
 		event("begin_block", "evidence", "ok")
 	}
 
-	return &abci.RequestFinalizeBlock{
+	return &abci.FinalizeBlockRequest{
 		Height:          blockHeight,
 		Time:            time,
 		ProposerAddress: proposer,

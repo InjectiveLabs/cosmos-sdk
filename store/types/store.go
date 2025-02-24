@@ -40,17 +40,17 @@ type CommitStore interface {
 //
 // This is an optional, but useful extension to any CommitStore
 type Queryable interface {
-	Query(*RequestQuery) (*ResponseQuery, error)
+	Query(*QueryRequest) (*QueryResponse, error)
 }
 
-type RequestQuery struct {
+type QueryRequest struct {
 	Data   []byte
 	Path   string
 	Height int64
 	Prove  bool
 }
 
-type ResponseQuery struct {
+type QueryResponse struct {
 	Code      uint32
 	Log       string
 	Info      string

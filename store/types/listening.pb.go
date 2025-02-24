@@ -100,7 +100,7 @@ func (m *StoreKVPair) GetValue() []byte {
 // the file streamer dump them into files together with the state changes.
 type BlockMetadata struct {
 	ResponseCommit        *v1.CommitResponse        `protobuf:"bytes,6,opt,name=response_commit,json=responseCommit,proto3" json:"response_commit,omitempty"`
-	RequestFinalizeBlock  *v1.FinalizeBlockRequest  `protobuf:"bytes,7,opt,name=request_finalize_block,json=requestFinalizeBlock,proto3" json:"request_finalize_block,omitempty"`
+	FinalizeBlockRequest  *v1.FinalizeBlockRequest  `protobuf:"bytes,7,opt,name=request_finalize_block,json=FinalizeBlockRequest,proto3" json:"request_finalize_block,omitempty"`
 	ResponseFinalizeBlock *v1.FinalizeBlockResponse `protobuf:"bytes,8,opt,name=response_finalize_block,json=responseFinalizeBlock,proto3" json:"response_finalize_block,omitempty"`
 }
 
@@ -144,9 +144,9 @@ func (m *BlockMetadata) GetResponseCommit() *v1.CommitResponse {
 	return nil
 }
 
-func (m *BlockMetadata) GetRequestFinalizeBlock() *v1.FinalizeBlockRequest {
+func (m *BlockMetadata) GetFinalizeBlockRequest() *v1.FinalizeBlockRequest {
 	if m != nil {
-		return m.RequestFinalizeBlock
+		return m.FinalizeBlockRequest
 	}
 	return nil
 }
@@ -281,9 +281,9 @@ func (m *BlockMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x42
 	}
-	if m.RequestFinalizeBlock != nil {
+	if m.FinalizeBlockRequest != nil {
 		{
-			size, err := m.RequestFinalizeBlock.MarshalToSizedBuffer(dAtA[:i])
+			size, err := m.FinalizeBlockRequest.MarshalToSizedBuffer(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -353,8 +353,8 @@ func (m *BlockMetadata) Size() (n int) {
 		l = m.ResponseCommit.Size()
 		n += 1 + l + sovListening(uint64(l))
 	}
-	if m.RequestFinalizeBlock != nil {
-		l = m.RequestFinalizeBlock.Size()
+	if m.FinalizeBlockRequest != nil {
+		l = m.FinalizeBlockRequest.Size()
 		n += 1 + l + sovListening(uint64(l))
 	}
 	if m.ResponseFinalizeBlock != nil {
@@ -607,7 +607,7 @@ func (m *BlockMetadata) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 7:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RequestFinalizeBlock", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field FinalizeBlockRequest", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -634,10 +634,10 @@ func (m *BlockMetadata) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.RequestFinalizeBlock == nil {
-				m.RequestFinalizeBlock = &v1.FinalizeBlockRequest{}
+			if m.FinalizeBlockRequest == nil {
+				m.FinalizeBlockRequest = &v1.FinalizeBlockRequest{}
 			}
-			if err := m.RequestFinalizeBlock.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.FinalizeBlockRequest.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

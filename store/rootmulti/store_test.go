@@ -463,7 +463,7 @@ func TestMultiStoreQuery(t *testing.T) {
 	require.Nil(t, err)
 
 	// Test bad path.
-	query := types.RequestQuery{Path: "/key", Data: k, Height: ver}
+	query := types.QueryRequest{Path: "/key", Data: k, Height: ver}
 	_, err = multi.Query(&query)
 	codespace, code, _ := errors.ABCIInfo(err, false)
 	require.EqualValues(t, types.ErrUnknownRequest.ABCICode(), code)

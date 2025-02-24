@@ -705,8 +705,8 @@ func (x *fastReflection_BlockMetadata) Range(f func(protoreflect.FieldDescriptor
 			return
 		}
 	}
-	if x.RequestFinalizeBlock != nil {
-		value := protoreflect.ValueOfMessage(x.RequestFinalizeBlock.ProtoReflect())
+	if x.FinalizeBlockRequest != nil {
+		value := protoreflect.ValueOfMessage(x.FinalizeBlockRequest.ProtoReflect())
 		if !f(fd_BlockMetadata_request_finalize_block, value) {
 			return
 		}
@@ -735,7 +735,7 @@ func (x *fastReflection_BlockMetadata) Has(fd protoreflect.FieldDescriptor) bool
 	case "cosmos.store.v1beta1.BlockMetadata.response_commit":
 		return x.ResponseCommit != nil
 	case "cosmos.store.v1beta1.BlockMetadata.request_finalize_block":
-		return x.RequestFinalizeBlock != nil
+		return x.FinalizeBlockRequest != nil
 	case "cosmos.store.v1beta1.BlockMetadata.response_finalize_block":
 		return x.ResponseFinalizeBlock != nil
 	default:
@@ -757,7 +757,7 @@ func (x *fastReflection_BlockMetadata) Clear(fd protoreflect.FieldDescriptor) {
 	case "cosmos.store.v1beta1.BlockMetadata.response_commit":
 		x.ResponseCommit = nil
 	case "cosmos.store.v1beta1.BlockMetadata.request_finalize_block":
-		x.RequestFinalizeBlock = nil
+		x.FinalizeBlockRequest = nil
 	case "cosmos.store.v1beta1.BlockMetadata.response_finalize_block":
 		x.ResponseFinalizeBlock = nil
 	default:
@@ -780,7 +780,7 @@ func (x *fastReflection_BlockMetadata) Get(descriptor protoreflect.FieldDescript
 		value := x.ResponseCommit
 		return protoreflect.ValueOfMessage(value.ProtoReflect())
 	case "cosmos.store.v1beta1.BlockMetadata.request_finalize_block":
-		value := x.RequestFinalizeBlock
+		value := x.FinalizeBlockRequest
 		return protoreflect.ValueOfMessage(value.ProtoReflect())
 	case "cosmos.store.v1beta1.BlockMetadata.response_finalize_block":
 		value := x.ResponseFinalizeBlock
@@ -808,7 +808,7 @@ func (x *fastReflection_BlockMetadata) Set(fd protoreflect.FieldDescriptor, valu
 	case "cosmos.store.v1beta1.BlockMetadata.response_commit":
 		x.ResponseCommit = value.Message().Interface().(*v1.CommitResponse)
 	case "cosmos.store.v1beta1.BlockMetadata.request_finalize_block":
-		x.RequestFinalizeBlock = value.Message().Interface().(*v1.FinalizeBlockRequest)
+		x.FinalizeBlockRequest = value.Message().Interface().(*v1.FinalizeBlockRequest)
 	case "cosmos.store.v1beta1.BlockMetadata.response_finalize_block":
 		x.ResponseFinalizeBlock = value.Message().Interface().(*v1.FinalizeBlockResponse)
 	default:
@@ -837,10 +837,10 @@ func (x *fastReflection_BlockMetadata) Mutable(fd protoreflect.FieldDescriptor) 
 		}
 		return protoreflect.ValueOfMessage(x.ResponseCommit.ProtoReflect())
 	case "cosmos.store.v1beta1.BlockMetadata.request_finalize_block":
-		if x.RequestFinalizeBlock == nil {
-			x.RequestFinalizeBlock = new(v1.FinalizeBlockRequest)
+		if x.FinalizeBlockRequest == nil {
+			x.FinalizeBlockRequest = new(v1.FinalizeBlockRequest)
 		}
-		return protoreflect.ValueOfMessage(x.RequestFinalizeBlock.ProtoReflect())
+		return protoreflect.ValueOfMessage(x.FinalizeBlockRequest.ProtoReflect())
 	case "cosmos.store.v1beta1.BlockMetadata.response_finalize_block":
 		if x.ResponseFinalizeBlock == nil {
 			x.ResponseFinalizeBlock = new(v1.FinalizeBlockResponse)
@@ -941,8 +941,8 @@ func (x *fastReflection_BlockMetadata) ProtoMethods() *protoiface.Methods {
 			l = options.Size(x.ResponseCommit)
 			n += 1 + l + runtime.Sov(uint64(l))
 		}
-		if x.RequestFinalizeBlock != nil {
-			l = options.Size(x.RequestFinalizeBlock)
+		if x.FinalizeBlockRequest != nil {
+			l = options.Size(x.FinalizeBlockRequest)
 			n += 1 + l + runtime.Sov(uint64(l))
 		}
 		if x.ResponseFinalizeBlock != nil {
@@ -992,8 +992,8 @@ func (x *fastReflection_BlockMetadata) ProtoMethods() *protoiface.Methods {
 			i--
 			dAtA[i] = 0x42
 		}
-		if x.RequestFinalizeBlock != nil {
-			encoded, err := options.Marshal(x.RequestFinalizeBlock)
+		if x.FinalizeBlockRequest != nil {
+			encoded, err := options.Marshal(x.FinalizeBlockRequest)
 			if err != nil {
 				return protoiface.MarshalOutput{
 					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
@@ -1107,7 +1107,7 @@ func (x *fastReflection_BlockMetadata) ProtoMethods() *protoiface.Methods {
 				iNdEx = postIndex
 			case 7:
 				if wireType != 2 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field RequestFinalizeBlock", wireType)
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field FinalizeBlockRequest", wireType)
 				}
 				var msglen int
 				for shift := uint(0); ; shift += 7 {
@@ -1134,10 +1134,10 @@ func (x *fastReflection_BlockMetadata) ProtoMethods() *protoiface.Methods {
 				if postIndex > l {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
 				}
-				if x.RequestFinalizeBlock == nil {
-					x.RequestFinalizeBlock = &v1.FinalizeBlockRequest{}
+				if x.FinalizeBlockRequest == nil {
+					x.FinalizeBlockRequest = &v1.FinalizeBlockRequest{}
 				}
-				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.RequestFinalizeBlock); err != nil {
+				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.FinalizeBlockRequest); err != nil {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
 				}
 				iNdEx = postIndex
@@ -1297,7 +1297,7 @@ type BlockMetadata struct {
 	unknownFields protoimpl.UnknownFields
 
 	ResponseCommit        *v1.CommitResponse        `protobuf:"bytes,6,opt,name=response_commit,json=responseCommit,proto3" json:"response_commit,omitempty"`
-	RequestFinalizeBlock  *v1.FinalizeBlockRequest  `protobuf:"bytes,7,opt,name=request_finalize_block,json=requestFinalizeBlock,proto3" json:"request_finalize_block,omitempty"`
+	FinalizeBlockRequest  *v1.FinalizeBlockRequest  `protobuf:"bytes,7,opt,name=request_finalize_block,json=FinalizeBlockRequest,proto3" json:"request_finalize_block,omitempty"`
 	ResponseFinalizeBlock *v1.FinalizeBlockResponse `protobuf:"bytes,8,opt,name=response_finalize_block,json=responseFinalizeBlock,proto3" json:"response_finalize_block,omitempty"` // TODO: should we renumber this?
 }
 
@@ -1328,9 +1328,9 @@ func (x *BlockMetadata) GetResponseCommit() *v1.CommitResponse {
 	return nil
 }
 
-func (x *BlockMetadata) GetRequestFinalizeBlock() *v1.FinalizeBlockRequest {
+func (x *BlockMetadata) GetFinalizeBlockRequest() *v1.FinalizeBlockRequest {
 	if x != nil {
-		return x.RequestFinalizeBlock
+		return x.FinalizeBlockRequest
 	}
 	return nil
 }

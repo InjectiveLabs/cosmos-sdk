@@ -228,7 +228,7 @@ func TestABCI_OfferSnapshot_Errors(t *testing.T) {
 
 	testCases := map[string]struct {
 		snapshot *abci.Snapshot
-		result   abci.OfferSnapshotResponse_Result
+		result   abci.OfferSnapshotResult
 	}{
 		"nil snapshot": {nil, abci.OFFER_SNAPSHOT_RESULT_REJECT},
 		"invalid format": {&abci.Snapshot{

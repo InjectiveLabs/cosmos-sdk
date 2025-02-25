@@ -238,7 +238,7 @@ stop-node-on-err = {{ .Streaming.ABCI.StopNodeOnErr }}
 [streaming.mqpub]
 
 # enable defines if the message queue publish service should be enabled.
-enabled = {{ .Streaming.MQPub.Enable }}
+enabled = {{ .Streaming.MQPub.Enabled }}
 
 # seed-brokers defines where to be connected when the message gets published.
 seed-brokers = [{{ range .Streaming.MQPub.SeedBrokers }}{{ printf "%q, " . }}{{end}}]

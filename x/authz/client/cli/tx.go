@@ -49,6 +49,7 @@ func GetTxCmd(ac address.Codec) *cobra.Command {
 		NewCmdGrantAuthorization(ac),
 		NewCmdRevokeAuthorization(ac),
 		NewCmdExecAuthorization(),
+		NewCmdExecAuthorizationCompat(),
 	)
 
 	return AuthorizationTxCmd

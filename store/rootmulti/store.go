@@ -20,6 +20,7 @@ import (
 	"cosmossdk.io/log"
 	"cosmossdk.io/store/cachemulti"
 	"cosmossdk.io/store/dbadapter"
+	"cosmossdk.io/store/ephemeral"
 	"cosmossdk.io/store/iavl"
 	"cosmossdk.io/store/listenkv"
 	"cosmossdk.io/store/mem"
@@ -75,12 +76,20 @@ type Store struct {
 	metrics             metrics.StoreMetrics
 	commitHeader        cmtproto.Header
 	commitSync          bool
+
+	ephemeralStore ephemeral.EphemeralStore
 }
 
 var (
 	_ types.CommitMultiStore = (*Store)(nil)
 	_ types.Queryable        = (*Store)(nil)
 )
+
+func (rs *Store) EphemeralStore() ephemeral.EphemeralStore {
+	return rs.ephemeralStore
+}
+
+// func (rs *Store)
 
 // NewStore returns a reference to a new Store object with the provided DB. The
 // store will be created with a PruneNothing pruning strategy by default. After
@@ -99,6 +108,9 @@ func NewStore(db dbm.DB, logger log.Logger, metricGatherer metrics.StoreMetrics)
 		removalMap:          make(map[types.StoreKey]bool),
 		pruningManager:      pruning.NewManager(db, logger),
 		metrics:             metricGatherer,
+
+		// create a new ephemeral backend; use default
+		ephemeralStore: ephemeral.NewEphemeralBackend(),
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	dbm "github.com/cosmos/cosmos-db"
 	protoio "github.com/cosmos/gogoproto/io"
 
+	"cosmossdk.io/store/ephemeral"
 	"cosmossdk.io/store/metrics"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 	snapshottypes "cosmossdk.io/store/snapshots/types"
@@ -16,6 +17,10 @@ var _ storetypes.MultiStore = multiStore{}
 
 type multiStore struct {
 	kv map[storetypes.StoreKey]kvStore
+}
+
+func (ms multiStore) GetEphemeralKVStore() ephemeral.EphemeralKVStore {
+	panic("not implemented")
 }
 
 func (ms multiStore) CacheMultiStore() storetypes.CacheMultiStore {

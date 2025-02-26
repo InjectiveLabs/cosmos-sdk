@@ -20,6 +20,7 @@ import (
 	"cosmossdk.io/log"
 	"cosmossdk.io/store/cachemulti"
 	"cosmossdk.io/store/dbadapter"
+	"cosmossdk.io/store/ephemeral"
 	"cosmossdk.io/store/iavl"
 	"cosmossdk.io/store/listenkv"
 	"cosmossdk.io/store/mem"
@@ -75,12 +76,16 @@ type Store struct {
 	metrics             metrics.StoreMetrics
 	commitHeader        cmtproto.Header
 	commitSync          bool
+
+	ephemeralKVStore ephemeral.EphemeralCommitKVStore
 }
 
 var (
 	_ types.CommitMultiStore = (*Store)(nil)
 	_ types.Queryable        = (*Store)(nil)
 )
+
+// func (rs *Store)
 
 // NewStore returns a reference to a new Store object with the provided DB. The
 // store will be created with a PruneNothing pruning strategy by default. After
@@ -99,6 +104,9 @@ func NewStore(db dbm.DB, logger log.Logger, metricGatherer metrics.StoreMetrics)
 		removalMap:          make(map[types.StoreKey]bool),
 		pruningManager:      pruning.NewManager(db, logger),
 		metrics:             metricGatherer,
+
+		// create a new ephemeral backend; use default
+		ephemeralKVStore: ephemeral.NewEphemeralBackend(),
 	}
 }
 
@@ -491,6 +499,7 @@ func (rs *Store) Commit() types.CommitID {
 	rs.lastCommitInfo = commitStores(version, rs.stores, rs.removalMap)
 	rs.lastCommitInfo.Timestamp = rs.commitHeader.Time
 	defer rs.flushMetadata(rs.db, version, rs.lastCommitInfo)
+	defer rs.ephemeralKVStore.Commit()
 
 	// remove remnants of removed stores
 	for sk := range rs.removalMap {
@@ -571,7 +580,14 @@ func (rs *Store) CacheMultiStore() types.CacheMultiStore {
 		}
 		stores[k] = store
 	}
-	return cachemulti.NewStore(rs.db, stores, rs.keysByName, rs.traceWriter, rs.getTracingContext())
+	return cachemulti.NewStore(
+		rs.db,
+		stores,
+		rs.keysByName,
+		rs.traceWriter,
+		rs.getTracingContext(),
+		rs.ephemeralKVStore,
+	)
 }
 
 // CacheMultiStoreWithVersion is analogous to CacheMultiStore except that it
@@ -631,7 +647,14 @@ func (rs *Store) CacheMultiStoreWithVersion(version int64) (types.CacheMultiStor
 		cachedStores[key] = cacheStore
 	}
 
-	return cachemulti.NewStore(rs.db, cachedStores, rs.keysByName, rs.traceWriter, rs.getTracingContext()), nil
+	return cachemulti.NewStore(
+		rs.db,
+		cachedStores,
+		rs.keysByName,
+		rs.traceWriter,
+		rs.getTracingContext(),
+		rs.ephemeralKVStore,
+	), nil
 }
 
 // GetStore returns a mounted Store for a given StoreKey. If the StoreKey does
@@ -670,6 +693,10 @@ func (rs *Store) GetKVStore(key types.StoreKey) types.KVStore {
 	}
 
 	return store
+}
+
+func (rs *Store) GetEphemeralKVStore() ephemeral.EphemeralKVStore {
+	return rs.ephemeralKVStore
 }
 
 func (rs *Store) handlePruning(version int64) error {

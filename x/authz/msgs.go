@@ -97,6 +97,24 @@ func NewMsgExec(grantee sdk.AccAddress, msgs []sdk.Msg) MsgExec {
 	}
 }
 
+// NewMsgExecCompat creates a new MsgExecCompat
+func NewMsgExecCompat(grantee sdk.AccAddress, msgs []sdk.Msg) MsgExecCompat {
+	msgsAny := make([]*cdctypes.Any, len(msgs))
+	for i, msg := range msgs {
+		any, err := cdctypes.NewAnyWithValue(msg)
+		if err != nil {
+			panic(err)
+		}
+	
+		msgsAny[i] = any
+	}
+
+	return MsgExecCompat{
+		Grantee: grantee.String(),
+		Msgs:    msgsAny,
+	}
+}
+
 // GetMessages returns the cache values from the MsgExecAuthorized.Msgs if present.
 func (msg MsgExec) GetMessages() ([]sdk.Msg, error) {
 	msgs := make([]sdk.Msg, len(msg.Msgs))

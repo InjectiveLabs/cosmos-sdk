@@ -328,7 +328,18 @@ Example:
 			if err != nil {
 				return err
 			}
-			msg := authz.NewMsgExecCompat(grantee, theTx.GetMsgs())
+
+			msgs := theTx.GetMsgs()
+			msgStrs := make([]string, len(msgs))
+			for i, msg := range msgs {
+				bz, err := clientCtx.Codec.MarshalInterfaceJSON(msg)
+				if err != nil {
+					return err
+				}
+				msgStrs[i] = string(bz)
+			}
+
+			msg := authz.NewMsgExecCompat(grantee, msgStrs)
 
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), &msg)
 		},

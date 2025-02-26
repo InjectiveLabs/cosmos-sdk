@@ -98,20 +98,10 @@ func NewMsgExec(grantee sdk.AccAddress, msgs []sdk.Msg) MsgExec {
 }
 
 // NewMsgExecCompat creates a new MsgExecCompat
-func NewMsgExecCompat(grantee sdk.AccAddress, msgs []sdk.Msg) MsgExecCompat {
-	msgsAny := make([]*cdctypes.Any, len(msgs))
-	for i, msg := range msgs {
-		any, err := cdctypes.NewAnyWithValue(msg)
-		if err != nil {
-			panic(err)
-		}
-	
-		msgsAny[i] = any
-	}
-
+func NewMsgExecCompat(grantee sdk.AccAddress, msgs []string) MsgExecCompat {
 	return MsgExecCompat{
 		Grantee: grantee.String(),
-		Msgs:    msgsAny,
+		Msgs:    msgs,
 	}
 }
 

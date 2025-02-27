@@ -2,6 +2,7 @@ package ephemeral
 
 type EphemeralBackend interface {
 	EphemeralStore
+	EphemeralCommitStore
 }
 
 const (

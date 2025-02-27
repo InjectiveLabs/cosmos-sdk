@@ -1,6 +1,7 @@
 package cachemulti
 
 import (
+	"cosmossdk.io/store/ephemeral"
 	"fmt"
 	"io"
 
@@ -167,4 +168,14 @@ func (cms Store) GetKVStore(key types.StoreKey) types.KVStore {
 		panic(fmt.Sprintf("kv store with key %v has not been registered in stores", key))
 	}
 	return store.(types.KVStore)
+}
+
+func (cms Store) GetEphemeralStore(key types.StoreKey) ephemeral.EphemeralStore {
+	// implement me
+	panic("implement me")
+}
+
+func (cms Store) GetEphemeralKVStore(key types.StoreKey) ephemeral.EphemeralKVStore {
+	// implement me
+	panic("implement me")
 }

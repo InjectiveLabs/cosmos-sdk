@@ -1,5 +1,7 @@
 package ephemeral
 
+import "cosmossdk.io/store/ephemeral/internal"
+
 type TypedEphemeralStore[T any] interface {
 	Get(key []byte) *T
 	Set(key []byte, value *T)
@@ -27,11 +29,7 @@ func (t *Placeholder[T]) Set(key []byte, value *T) {
 	panic("unimplemented")
 }
 
-type TypedEphemeralIterator[T any] interface {
-	Next()
-	Key() []byte
-	Value() *T
-}
+type TypedEphemeralIterator[T any] internal.TypedEphemeralIterator[T]
 
 var _ TypedEphemeralStore[any] = (*Placeholder[any])(nil)
 

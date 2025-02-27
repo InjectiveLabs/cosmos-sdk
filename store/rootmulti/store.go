@@ -77,17 +77,13 @@ type Store struct {
 	commitHeader        cmtproto.Header
 	commitSync          bool
 
-	ephemeralStore ephemeral.EphemeralStore
+	ephemeralKVStore ephemeral.EphemeralKVStore
 }
 
 var (
 	_ types.CommitMultiStore = (*Store)(nil)
 	_ types.Queryable        = (*Store)(nil)
 )
-
-func (rs *Store) EphemeralStore() ephemeral.EphemeralStore {
-	return rs.ephemeralStore
-}
 
 // func (rs *Store)
 
@@ -110,7 +106,7 @@ func NewStore(db dbm.DB, logger log.Logger, metricGatherer metrics.StoreMetrics)
 		metrics:             metricGatherer,
 
 		// create a new ephemeral backend; use default
-		ephemeralStore: ephemeral.NewEphemeralBackend(),
+		ephemeralKVStore: ephemeral.NewEphemeralKVStore(),
 	}
 }
 

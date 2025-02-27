@@ -22,6 +22,7 @@ type cacheMergeIterator struct {
 
 var _ TypedEphemeralIterator[any] = (*cacheMergeIterator)(nil)
 
+// TODO: handle tombstone
 func NewCacheMergeIterator(parent, cache TypedEphemeralIterator[any], ascending bool) TypedEphemeralIterator[any] {
 	iter := &cacheMergeIterator{
 		parent:    parent,

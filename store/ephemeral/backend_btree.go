@@ -50,6 +50,7 @@ func (e *EphemeralBackendBTree) Commit() {
 func (e *EphemeralBackendBTree) Get(key []byte) any {
 	val := e.btree.Get(key)
 	if val == nil {
+		// TODO: handle tombstone
 		return e.batch.Get(key)
 	}
 	return val

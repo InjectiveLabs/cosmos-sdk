@@ -48,6 +48,7 @@ func (e *EphemeralCacheKV) Delete(key []byte) {
 }
 
 func (e *EphemeralCacheKV) Get(key []byte) any {
+	// TODO: handle tombstone
 	cached := e.cacheBTree.Get(key)
 	if cached != nil {
 		return cached

@@ -22,7 +22,7 @@ func NewEphemeralStore(parent ephemeral.EphemeralKVStore, gasMeter types.GasMete
 }
 
 func (e *EphemeralStore) Branch() ephemeral.EphemeralCacheKVStore {
-	return ephemeral.NewEphemeralCacheKV(e)
+	panic("cannot branch GasEphemeralStore")
 }
 
 func (e *EphemeralStore) Get(key []byte) any {

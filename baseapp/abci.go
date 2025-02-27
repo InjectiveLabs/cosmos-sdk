@@ -950,7 +950,13 @@ func (app *BaseApp) Commit() (*abci.ResponseCommit, error) {
 		rms.SetCommitHeader(header)
 	}
 
-	app.cms.Commit()
+	commitId := app.cms.Commit()
+
+	app.FlushStreamEvents(header.Height, header.Time, StreamEventsFlush{
+		PrevAppHash:   header.AppHash,
+		NewAppHash:    commitId.Hash,
+		PublishEvents: app.finalizeBlockState.Context().PublishEventManager().Events(),
+	})
 
 	resp := &abci.ResponseCommit{
 		RetainHeight: retainHeight,

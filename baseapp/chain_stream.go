@@ -8,9 +8,9 @@ import (
 )
 
 type StreamEventsFlush struct {
-	NewEvents   []types.PublishEvent
-	PrevAppHash []byte
-	NewAppHash  []byte
+	PublishEvents []types.PublishEvent
+	PrevAppHash   []byte
+	NewAppHash    []byte
 }
 
 type StreamEvents struct {

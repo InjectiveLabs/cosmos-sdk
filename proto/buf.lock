@@ -4,7 +4,7 @@ deps:
   - remote: buf.build
     owner: cometbft
     repository: cometbft
-    commit: 9110599d25a84c3f91fef0dd84e345c2
+    commit: 68e42a58b3014033aee53aa3202bf37c
   - remote: buf.build
     owner: cosmos
     repository: cosmos-proto

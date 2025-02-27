@@ -28,7 +28,7 @@ func (pv PV) GetPubKey() (crypto.PubKey, error) {
 }
 
 // SignVote implements PrivValidator interface
-func (pv PV) SignVote(chainID string, vote *cmtproto.Vote) error {
+func (pv PV) SignVote(chainID string, vote *cmtproto.Vote, _ bool) error {
 	signBytes := cmttypes.VoteSignBytes(chainID, vote)
 	sig, err := pv.PrivKey.Sign(signBytes)
 	if err != nil {
@@ -47,4 +47,8 @@ func (pv PV) SignProposal(chainID string, proposal *cmtproto.Proposal) error {
 	}
 	proposal.Signature = sig
 	return nil
+}
+
+func (pv PV) SignBytes(bytes []byte) ([]byte, error) {
+	return pv.PrivKey.Sign(bytes)
 }

@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	abci "github.com/cometbft/cometbft/abci/types"
-	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"cosmossdk.io/core/header"
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
 	sdkmath "cosmossdk.io/math"
@@ -166,7 +166,7 @@ func TestSendNotEnoughBalance(t *testing.T) {
 	origSeq := res1.GetSequence()
 
 	sendMsg := types.NewMsgSend(addr1, addr2, sdk.Coins{sdk.NewInt64Coin("foocoin", 100)})
-	header := cmtproto.Header{Height: baseApp.LastBlockHeight() + 1}
+	header := header.Info{Height: baseApp.LastBlockHeight() + 1}
 	txConfig := moduletestutil.MakeTestTxConfig()
 	_, _, err = simtestutil.SignCheckDeliver(t, txConfig, baseApp, header, []sdk.Msg{sendMsg}, "", []uint64{origAccNum}, []uint64{origSeq}, false, false, priv1)
 	require.Error(t, err)
@@ -246,7 +246,7 @@ func TestMsgMultiSendWithAccounts(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("testing %s", tc.desc)
-		header := cmtproto.Header{Height: baseApp.LastBlockHeight() + 1}
+		header := header.Info{Height: baseApp.LastBlockHeight() + 1}
 		txConfig := moduletestutil.MakeTestTxConfig()
 		_, _, err := simtestutil.SignCheckDeliver(t, txConfig, baseApp, header, tc.msgs, "", tc.accNums, tc.accSeqs, tc.expSimPass, tc.expPass, tc.privKeys...)
 		if tc.expPass {
@@ -298,7 +298,7 @@ func TestMsgMultiSendMultipleOut(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		header := cmtproto.Header{Height: baseApp.LastBlockHeight() + 1}
+		header := header.Info{Height: baseApp.LastBlockHeight() + 1}
 		txConfig := moduletestutil.MakeTestTxConfig()
 		_, _, err := simtestutil.SignCheckDeliver(t, txConfig, baseApp, header, tc.msgs, "", tc.accNums, tc.accSeqs, tc.expSimPass, tc.expPass, tc.privKeys...)
 		require.NoError(t, err)
@@ -353,7 +353,7 @@ func TestMsgMultiSendDependent(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		header := cmtproto.Header{Height: baseApp.LastBlockHeight() + 1}
+		header := header.Info{Height: baseApp.LastBlockHeight() + 1}
 		txConfig := moduletestutil.MakeTestTxConfig()
 		_, _, err := simtestutil.SignCheckDeliver(t, txConfig, baseApp, header, tc.msgs, "", tc.accNums, tc.accSeqs, tc.expSimPass, tc.expPass, tc.privKeys...)
 		require.NoError(t, err)
@@ -433,7 +433,7 @@ func TestMsgSetSendEnabled(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(tt *testing.T) {
-			header := cmtproto.Header{Height: s.App.LastBlockHeight() + 1}
+			header := header.Info{Height: s.App.LastBlockHeight() + 1}
 			txGen := moduletestutil.MakeTestTxConfig()
 			_, _, err = simtestutil.SignCheckDeliver(tt, txGen, s.App.BaseApp, header, tc.msgs, "", []uint64{0}, tc.accSeqs, tc.expSimPass, tc.expPass, priv1)
 			if len(tc.expInError) > 0 {

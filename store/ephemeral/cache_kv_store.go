@@ -31,7 +31,7 @@ func (e *EphemeralCacheKV) Write() {
 	defer iter.Close()
 
 	for ; iter.Valid(); iter.Next() {
-		if _, ok := iter.Value().(*tombstone); ok {
+		if internal.IsTombstone(iter.Value()) {
 			e.parent.Delete(iter.Key())
 		} else {
 			e.parent.Set(iter.Key(), iter.Value())
@@ -44,13 +44,15 @@ func (e *EphemeralCacheKV) Set(key []byte, value any) {
 }
 
 func (e *EphemeralCacheKV) Delete(key []byte) {
-	e.cacheBTree.Set(key, &tombstone{})
+	e.cacheBTree.Set(key, internal.NewTombstone())
 }
 
 func (e *EphemeralCacheKV) Get(key []byte) any {
-	// TODO: handle tombstone
 	cached := e.cacheBTree.Get(key)
 	if cached != nil {
+		if internal.IsTombstone(cached) {
+			return nil
+		}
 		return cached
 	}
 

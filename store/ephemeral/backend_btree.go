@@ -36,7 +36,7 @@ func (e *EphemeralBackendBTree) Commit() {
 
 	newTree := e.btree.Copy()
 	for ; iter.Valid(); iter.Next() {
-		if _, ok := iter.Value().(*tombstone); ok {
+		if internal.IsTombstone(iter.Value()) {
 			newTree.Delete(iter.Key())
 		} else {
 			newTree.Set(iter.Key(), iter.Value())
@@ -48,20 +48,23 @@ func (e *EphemeralBackendBTree) Commit() {
 }
 
 func (e *EphemeralBackendBTree) Get(key []byte) any {
-	val := e.btree.Get(key)
-	if val == nil {
-		// TODO: handle tombstone
-		return e.batch.Get(key)
+	val := e.batch.Get(key)
+	if val != nil {
+		if internal.IsTombstone(val) {
+			return nil
+		}
+		return val
 	}
-	return val
-}
 
-func (e *EphemeralBackendBTree) Delete(key []byte) {
-	e.batch.Set(key, &tombstone{})
+	return e.btree.Get(key)
 }
 
 func (e *EphemeralBackendBTree) Set(key []byte, value any) {
 	e.batch.Set(key, &value)
+}
+
+func (e *EphemeralBackendBTree) Delete(key []byte) {
+	e.batch.Set(key, internal.NewTombstone())
 }
 
 func (e *EphemeralBackendBTree) Iterator(start []byte, end []byte) EphemeralIterator {
@@ -80,7 +83,6 @@ func (e *EphemeralBackendBTree) Iterator(start []byte, end []byte) EphemeralIter
 	return internal.NewCacheMergeIterator(mainIter, batchIter, true)
 }
 
-// TODO: btree + batch merged iterator?
 func (e *EphemeralBackendBTree) ReverseIterator(start []byte, end []byte) EphemeralIterator {
 	mainIter, err := e.btree.ReverseIterator(start, end)
 	if err != nil {

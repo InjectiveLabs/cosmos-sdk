@@ -4,10 +4,11 @@ import (
 	"time"
 
 	abci "github.com/cometbft/cometbft/abci/types"
+	types "github.com/cosmos/cosmos-sdk/types"
 )
 
 type StreamEventsFlush struct {
-	NewEvents   []interface{}
+	NewEvents   []types.PublishEvent
 	PrevAppHash []byte
 	NewAppHash  []byte
 }

@@ -813,9 +813,7 @@ func (m *Manager) EndBlock(ctx sdk.Context) (sdk.EndBlock, error) {
 					return sdk.EndBlock{}, errors.New("validator EndBlock updates already set by a previous module")
 				}
 
-				for _, updates := range moduleValUpdates {
-					validatorUpdates = append(validatorUpdates, abci.ValidatorUpdate{PubKey: updates.PubKey, Power: updates.Power})
-				}
+				validatorUpdates = append(validatorUpdates, moduleValUpdates...)
 			}
 		} else {
 			continue

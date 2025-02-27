@@ -577,7 +577,7 @@ func TestABCI_CheckTx(t *testing.T) {
 		txBytes, err := suite.txConfig.TxEncoder()(tx)
 		require.NoError(t, err)
 
-		r, err := suite.baseApp.CheckTx(&abci.CheckTxRequest{Tx: txBytes})
+		r, err := suite.baseApp.CheckTx(&abci.CheckTxRequest{Tx: txBytes, Type: abci.CHECK_TX_TYPE_CHECK})
 		require.NoError(t, err)
 		require.True(t, r.IsOK(), fmt.Sprintf("%v", r))
 		require.Empty(t, r.GetEvents())
@@ -2451,7 +2451,7 @@ func TestABCI_Proposal_FailReCheckTx(t *testing.T) {
 	// call recheck on the first tx, it MUST return an error
 	reqReCheckTx := abci.CheckTxRequest{
 		Tx:   txBytes,
-		Type: abci.CHECK_TX_TYPE_CHECK,
+		Type: abci.CHECK_TX_TYPE_RECHECK,
 	}
 	resp, err := suite.baseApp.CheckTx(&reqReCheckTx)
 	require.NoError(t, err)

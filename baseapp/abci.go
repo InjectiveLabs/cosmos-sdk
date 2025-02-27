@@ -342,7 +342,7 @@ func (app *BaseApp) CheckTx(req *abci.CheckTxRequest) (*abci.CheckTxResponse, er
 	case req.Type == abci.CHECK_TX_TYPE_CHECK:
 		mode = execModeCheck
 
-	case req.Type == abci.CHECK_TX_TYPE_CHECK:
+	case req.Type == abci.CHECK_TX_TYPE_RECHECK:
 		mode = execModeReCheck
 
 	default:

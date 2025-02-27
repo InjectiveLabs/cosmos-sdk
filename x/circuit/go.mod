@@ -2,8 +2,6 @@ module cosmossdk.io/x/circuit
 
 go 1.23.5
 
-toolchain go1.23.6
-
 require (
 	cosmossdk.io/api v0.7.5
 	cosmossdk.io/collections v0.4.0
@@ -195,7 +193,6 @@ replace (
 	cosmossdk.io/api => ../../api
 	cosmossdk.io/core => ../../core
 	cosmossdk.io/depinject => ../../depinject
-	cosmossdk.io/x/accounts => ../accounts
 	cosmossdk.io/x/auth => ../auth
 	cosmossdk.io/x/bank => ../bank
 	cosmossdk.io/x/consensus => ../consensus

@@ -1,6 +1,10 @@
 package ephemeral
 
-import "cosmossdk.io/store/ephemeral/internal"
+import (
+	"sync"
+
+	"cosmossdk.io/store/ephemeral/internal"
+)
 
 var _ EphemeralCacheKVStore = (*EphemeralCacheKV)(nil)
 
@@ -8,14 +12,15 @@ func NewEphemeralCacheKV(parent EphemeralKVStore) *EphemeralCacheKV {
 	return &EphemeralCacheKV{
 		parent: parent,
 
+		mtx:        &sync.RWMutex{},
 		cacheBTree: internal.NewBTree(),
 	}
 }
 
-// TODO: make thread-safe
 type EphemeralCacheKV struct {
 	parent EphemeralKVStore
 
+	mtx        *sync.RWMutex
 	cacheBTree *internal.BTree
 }
 
@@ -24,6 +29,9 @@ func (e *EphemeralCacheKV) Branch() EphemeralCacheKVStore {
 }
 
 func (e *EphemeralCacheKV) Write() {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+
 	iter, err := e.cacheBTree.Iterator(nil, nil)
 	if err != nil {
 		panic(err)
@@ -40,15 +48,22 @@ func (e *EphemeralCacheKV) Write() {
 }
 
 func (e *EphemeralCacheKV) Set(key []byte, value any) {
+	e.mtx.Lock()
 	e.cacheBTree.Set(key, &value)
+	e.mtx.Unlock()
 }
 
 func (e *EphemeralCacheKV) Delete(key []byte) {
+	e.mtx.Lock()
 	e.cacheBTree.Set(key, internal.NewTombstone())
+	e.mtx.Unlock()
 }
 
 func (e *EphemeralCacheKV) Get(key []byte) any {
+	e.mtx.RLock()
 	cached := e.cacheBTree.Get(key)
+	e.mtx.RUnlock()
+
 	if cached != nil {
 		if internal.IsTombstone(cached) {
 			return nil
@@ -60,23 +75,31 @@ func (e *EphemeralCacheKV) Get(key []byte) any {
 }
 
 func (e *EphemeralCacheKV) Iterator(start []byte, end []byte) EphemeralIterator {
-	parentIter := e.parent.Iterator(start, end)
+	e.mtx.RLock()
+	btree := e.cacheBTree.Copy()
+	e.mtx.RUnlock()
 
-	cacheIter, err := e.cacheBTree.Iterator(start, end)
+	cacheIter, err := btree.Iterator(start, end)
 	if err != nil {
 		panic(err)
 	}
+
+	parentIter := e.parent.Iterator(start, end)
 
 	return internal.NewCacheMergeIterator(parentIter, cacheIter, true)
 }
 
 func (e *EphemeralCacheKV) ReverseIterator(start []byte, end []byte) EphemeralIterator {
-	parentIter := e.parent.ReverseIterator(start, end)
+	e.mtx.RLock()
+	btree := e.cacheBTree.Copy()
+	e.mtx.RUnlock()
 
-	cacheIter, err := e.cacheBTree.ReverseIterator(start, end)
+	cacheIter, err := btree.ReverseIterator(start, end)
 	if err != nil {
 		panic(err)
 	}
+
+	parentIter := e.parent.ReverseIterator(start, end)
 
 	return internal.NewCacheMergeIterator(parentIter, cacheIter, false)
 }

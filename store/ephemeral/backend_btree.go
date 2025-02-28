@@ -1,40 +1,49 @@
 package ephemeral
 
 import (
+	"sync"
+	"sync/atomic"
+
 	"cosmossdk.io/store/ephemeral/internal"
 )
 
 var _ EphemeralCommitKVStore = (*EphemeralBackendBTree)(nil)
 
 func NewEphemeralBackendBTree() *EphemeralBackendBTree {
+	btree := &atomic.Pointer[internal.BTree]{}
+	btree.Store(internal.NewBTree())
+
 	return &EphemeralBackendBTree{
-		btree: internal.NewBTree(),
-		batch: internal.NewBTree(),
+		readOnlyBTree: btree,
+		batch:         internal.NewBTree(),
+
+		mtx: &sync.RWMutex{},
 	}
 }
 
-// TODO: make thread-safe
 type EphemeralBackendBTree struct {
-	// mtx   *sync.RWMutex
-	btree *internal.BTree
+	readOnlyBTree *atomic.Pointer[internal.BTree]
 
 	batch *internal.BTree
+
+	mtx *sync.RWMutex
 }
 
-// Branch implements EphemeralBackend.
 func (e *EphemeralBackendBTree) Branch() EphemeralCacheKVStore {
 	return NewEphemeralCacheKV(e)
 }
 
-// Commit implements EphemeralBackend.
 func (e *EphemeralBackendBTree) Commit() {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+
 	iter, err := e.batch.Iterator(nil, nil)
 	if err != nil {
 		panic(err)
 	}
 	defer iter.Close()
 
-	newTree := e.btree.Copy()
+	newTree := e.readOnlyBTree.Load().Copy()
 	for ; iter.Valid(); iter.Next() {
 		if internal.IsTombstone(iter.Value()) {
 			newTree.Delete(iter.Key())
@@ -43,12 +52,14 @@ func (e *EphemeralBackendBTree) Commit() {
 		}
 	}
 
-	e.btree = newTree
+	e.readOnlyBTree.Store(newTree)
 	e.batch.Clear()
 }
 
 func (e *EphemeralBackendBTree) Get(key []byte) any {
+	e.mtx.RLock()
 	val := e.batch.Get(key)
+	e.mtx.RUnlock()
 	if val != nil {
 		if internal.IsTombstone(val) {
 			return nil
@@ -56,25 +67,30 @@ func (e *EphemeralBackendBTree) Get(key []byte) any {
 		return val
 	}
 
-	return e.btree.Get(key)
+	return e.readOnlyBTree.Load().Get(key)
 }
 
 func (e *EphemeralBackendBTree) Set(key []byte, value any) {
+	e.mtx.Lock()
 	e.batch.Set(key, &value)
+	e.mtx.Unlock()
 }
 
 func (e *EphemeralBackendBTree) Delete(key []byte) {
+	e.mtx.Lock()
 	e.batch.Set(key, internal.NewTombstone())
+	e.mtx.Unlock()
 }
 
 func (e *EphemeralBackendBTree) Iterator(start []byte, end []byte) EphemeralIterator {
-	mainIter, err := e.btree.Iterator(start, end)
+	mainIter, err := e.readOnlyBTree.Load().Iterator(start, end)
 	if err != nil {
 		panic(err)
 	}
 
-	// TODO: lock?
+	e.mtx.RLock()
 	batchTree := e.batch.Copy()
+	e.mtx.RUnlock()
 	batchIter, err := batchTree.Iterator(start, end)
 	if err != nil {
 		panic(err)
@@ -84,13 +100,14 @@ func (e *EphemeralBackendBTree) Iterator(start []byte, end []byte) EphemeralIter
 }
 
 func (e *EphemeralBackendBTree) ReverseIterator(start []byte, end []byte) EphemeralIterator {
-	mainIter, err := e.btree.ReverseIterator(start, end)
+	mainIter, err := e.readOnlyBTree.Load().ReverseIterator(start, end)
 	if err != nil {
 		panic(err)
 	}
 
-	// TODO: lock?
+	e.mtx.RLock()
 	batchTree := e.batch.Copy()
+	e.mtx.RUnlock()
 	batchIter, err := batchTree.ReverseIterator(start, end)
 	if err != nil {
 		panic(err)

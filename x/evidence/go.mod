@@ -201,4 +201,4 @@ replace (
 )
 
 // Use store v1.1.0 bumped to CometBFT v1
-replace cosmossdk.io/store => cosmossdk.io/store v1.1.1-0.20240418092142-896cdf1971bc
+replace cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v1.1.1-0.20250303163942-1853f781be39

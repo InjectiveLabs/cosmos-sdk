@@ -10,7 +10,7 @@ require (
 	cosmossdk.io/core v0.12.1-0.20231114100755-569e3ff6a0d7
 	cosmossdk.io/depinject v1.0.0
 	cosmossdk.io/errors v1.0.1
-	cosmossdk.io/store v1.1.1-0.20240418092142-896cdf1971bc
+	cosmossdk.io/store v1.1.0
 	github.com/cockroachdb/errors v1.11.3
 	github.com/cometbft/cometbft v1.0.1
 	github.com/cometbft/cometbft/api v1.0.0
@@ -201,3 +201,6 @@ replace (
 	cosmossdk.io/x/consensus => ../consensus
 	cosmossdk.io/x/staking => ../staking
 )
+
+// Use store v1.1.0 bumped to CometBFT v1
+replace cosmossdk.io/store => cosmossdk.io/store v1.1.1-0.20240418092142-896cdf1971bc

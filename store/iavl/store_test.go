@@ -143,7 +143,7 @@ func TestGetImmutable(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, newStore.Get([]byte("hello")), []byte("adios"))
 
-	res, err := newStore.Query(&types.QueryRequest{Data: []byte("hello"), Height: cID.Version, Path: "/key", Prove: true})
+	res, err := newStore.Query(&types.RequestQuery{Data: []byte("hello"), Height: cID.Version, Path: "/key", Prove: true})
 	require.NoError(t, err)
 	require.Equal(t, res.Value, []byte("adios"))
 	require.NotNil(t, res.ProofOps)
@@ -503,8 +503,8 @@ func TestIAVLStoreQuery(t *testing.T) {
 
 	cid := iavlStore.Commit()
 	ver := cid.Version
-	query := types.QueryRequest{Path: "/key", Data: k1, Height: ver}
-	querySub := types.QueryRequest{Path: "/subspace", Data: ksub, Height: ver}
+	query := types.RequestQuery{Path: "/key", Data: k1, Height: ver}
+	querySub := types.RequestQuery{Path: "/subspace", Data: ksub, Height: ver}
 
 	// query subspace before anything set
 	qres, err := iavlStore.Query(&querySub)
@@ -558,7 +558,7 @@ func TestIAVLStoreQuery(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint32(0), qres.Code)
 	require.Equal(t, v3, qres.Value)
-	query2 := types.QueryRequest{Path: "/key", Data: k2, Height: cid.Version}
+	query2 := types.RequestQuery{Path: "/key", Data: k2, Height: cid.Version}
 
 	qres, err = iavlStore.Query(&query2)
 	require.NoError(t, err)
@@ -571,7 +571,7 @@ func TestIAVLStoreQuery(t *testing.T) {
 	require.Equal(t, valExpSub2, qres.Value)
 
 	// default (height 0) will show latest -1
-	query0 := types.QueryRequest{Path: "/key", Data: k1}
+	query0 := types.RequestQuery{Path: "/key", Data: k1}
 	qres, err = iavlStore.Query(&query0)
 	require.NoError(t, err)
 	require.Equal(t, uint32(0), qres.Code)

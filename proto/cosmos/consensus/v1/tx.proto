@@ -38,7 +38,9 @@ message MsgUpdateParams {
   cometbft.types.v1.ValidatorParams validator = 4;
 
   // Since: cosmos-sdk 0.50
-  cometbft.types.v1.ABCIParams abci = 5;
+  cometbft.types.v1.ABCIParams      abci      = 5;
+  cometbft.types.v1.SynchronyParams synchrony = 6;
+  cometbft.types.v1.FeatureParams   feature   = 7;
 }
 
 // MsgUpdateParamsResponse defines the response structure for executing a

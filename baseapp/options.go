@@ -8,6 +8,7 @@ import (
 	"github.com/InjectiveLabs/metrics"
 	dbm "github.com/cosmos/cosmos-db"
 
+	"cosmossdk.io/store/ephemeral"
 	sdkmetrics "cosmossdk.io/store/metrics"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 	"cosmossdk.io/store/snapshots"
@@ -397,4 +398,12 @@ func (app *BaseApp) SetMsgServiceRouter(msgServiceRouter *MsgServiceRouter) {
 // SetGRPCQueryRouter sets the GRPCQueryRouter of the BaseApp.
 func (app *BaseApp) SetGRPCQueryRouter(grpcQueryRouter *GRPCQueryRouter) {
 	app.grpcQueryRouter = grpcQueryRouter
+}
+
+func (app *BaseApp) SetWarmupEphemeralStore(cb func(ephemeral.EphemeralKVStore, storetypes.StoreKey, storetypes.KVStore) error) {
+	if app.sealed {
+		panic("SetWarmupEphemeralStore() on sealed BaseApp")
+	}
+
+	app.cms.SetWarmupEphemeral(cb)
 }

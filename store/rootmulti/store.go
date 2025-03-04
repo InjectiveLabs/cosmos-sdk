@@ -78,6 +78,7 @@ type Store struct {
 	commitSync          bool
 
 	ephemeralKVStore ephemeral.EphemeralCommitKVStore
+	warmupEphemeral  func(ephemeral.EphemeralKVStore, types.StoreKey, types.KVStore) error
 }
 
 var (
@@ -147,6 +148,10 @@ func (rs *Store) SetIAVLCacheSize(cacheSize int) {
 
 func (rs *Store) SetIAVLDisableFastNode(disableFastNode bool) {
 	rs.iavlDisableFastNode = disableFastNode
+}
+
+func (rs *Store) SetWarmupEphemeral(f func(ephemeral.EphemeralKVStore, types.StoreKey, types.KVStore) error) {
+	rs.warmupEphemeral = f
 }
 
 // GetStoreType implements Store.
@@ -306,6 +311,14 @@ func (rs *Store) loadVersion(ver int64, upgrades *types.StoreUpgrades) error {
 
 	rs.lastCommitInfo = cInfo
 	rs.stores = newStores
+
+	if rs.warmupEphemeral != nil {
+		for key, store := range rs.stores {
+			if err := rs.warmupEphemeral(rs.ephemeralKVStore, key, store); err != nil {
+				return errorsmod.Wrapf(err, "failed to warmup ephemeral store %s", key.Name())
+			}
+		}
+	}
 
 	// load any snapshot heights we missed from disk to be pruned on the next run
 	if err := rs.pruningManager.LoadSnapshotHeights(rs.db); err != nil {

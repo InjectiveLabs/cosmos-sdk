@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	abci "github.com/cometbft/cometbft/abci/types"
-	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	"github.com/stretchr/testify/require"
 
+	coreheader "cosmossdk.io/core/header"
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
 	"cosmossdk.io/math"
@@ -85,7 +85,7 @@ func TestSlashingMsgs(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	header := cmtproto.Header{Height: app.LastBlockHeight() + 1}
+	header := coreheader.Info{Height: app.LastBlockHeight() + 1}
 	txConfig := moduletestutil.MakeTestTxConfig()
 	_, _, err = sims.SignCheckDeliver(t, txConfig, app.BaseApp, header, []sdk.Msg{createValidatorMsg}, "", []uint64{0}, []uint64{0}, true, true, priv1)
 	require.NoError(t, err)
@@ -107,8 +107,8 @@ func TestSlashingMsgs(t *testing.T) {
 	require.NoError(t, err)
 
 	// unjail should fail with unknown validator
-	header = cmtproto.Header{Height: app.LastBlockHeight() + 1}
+	header = coreheader.Info{Height: app.LastBlockHeight() + 1}
 	_, _, err = sims.SignCheckDeliver(t, txConfig, app.BaseApp, header, []sdk.Msg{unjailMsg}, "", []uint64{0}, []uint64{1}, false, false, priv1)
 	require.Error(t, err)
-	require.True(t, errors.Is(types.ErrValidatorNotJailed, err))
+	require.True(t, errors.Is(err, types.ErrValidatorNotJailed))
 }

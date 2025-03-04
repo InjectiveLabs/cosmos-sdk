@@ -27,7 +27,7 @@ func NewTypedEpeheralKVStore[T Sized](ephemeralStore EphemeralKVStore) TypedEphe
 func (t *typedEphemeralKVStore[T]) Get(key []byte) T {
 	v := t.store.Get(key)
 	if v != nil {
-		return v.(any).(T)
+		return v.(T)
 	}
 
 	var zero T

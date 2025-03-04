@@ -18,10 +18,7 @@ type typedEphemeralKVStore[T Sized] struct {
 	store EphemeralKVStore
 }
 
-func NewTypedEpeheralKVStore[T Sized](
-	prefix []byte,
-	ephemeralStore EphemeralKVStore,
-) TypedEphemeralStore[T] {
+func NewTypedEpeheralKVStore[T Sized](ephemeralStore EphemeralKVStore) TypedEphemeralStore[T] {
 	return &typedEphemeralKVStore[T]{
 		store: ephemeralStore,
 	}

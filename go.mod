@@ -194,22 +194,16 @@ require (
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
-// Here are the short-lived replace from the Cosmos SDK
-// Replace here are pending PRs, or version to be tagged
-// replace (
-// 	<temporary replace>
-replace cosmossdk.io/api => ./api
-
 // )
 replace cosmossdk.io/api => ./api
 
 // Below are the long-lived replace of the Cosmos SDK
 replace (
 	cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v1.1.1-0.20250303163942-1853f781be39
-	// TODO(sainoe): figure out where it's used and bump
-	cosmossdk.io/x/evidence => github.com/InjectiveLabs/cosmos-sdk/x/evidence v0.1.1-0.20240522173845-46ef88f66790
-	cosmossdk.io/x/feegrant => github.com/InjectiveLabs/cosmos-sdk/x/feegrant v0.1.1-0.20240522173845-46ef88f66790
-	cosmossdk.io/x/upgrade => github.com/InjectiveLabs/cosmos-sdk/x/upgrade v0.1.2-0.20240522173845-46ef88f66790
+	// TODO(sainoe) => figure out if the three imports above are needed
+	cosmossdk.io/x/evidence => github.com/InjectiveLabs/cosmos-sdk/x/evidence v1.1.1-0.20250303163942-1853f781be39
+	cosmossdk.io/x/feegrant => github.com/InjectiveLabs/cosmos-sdk/x/feegrant v1.1.1-0.20250303163942-1853f781be39
+	cosmossdk.io/x/upgrade => github.com/InjectiveLabs/cosmos-sdk/x/upgrade v1.1.1-0.20250303163942-1853f781be39
 
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0

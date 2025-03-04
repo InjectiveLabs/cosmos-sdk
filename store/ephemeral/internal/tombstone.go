@@ -10,6 +10,10 @@ func IsTombstone(v any) bool {
 	return ok
 }
 
-func NewTombstone() any {
+func NewTombstone() Sized {
 	return &tombstone{}
+}
+
+func (t *tombstone) Size() int {
+	return 0
 }

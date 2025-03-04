@@ -37,11 +37,11 @@ func (p *prefixEphemeralKVStore) Branch() EphemeralCacheKVStore {
 	return NewEphemeralCacheKV(p)
 }
 
-func (p *prefixEphemeralKVStore) Get(key []byte) any {
+func (p *prefixEphemeralKVStore) Get(key []byte) Sized {
 	return p.parent.Get(p.key(key))
 }
 
-func (p *prefixEphemeralKVStore) Set(key []byte, value any) {
+func (p *prefixEphemeralKVStore) Set(key []byte, value Sized) {
 	p.parent.Set(p.key(key), value)
 }
 
@@ -154,7 +154,7 @@ func (p *prefixedEphemeralIterator) Valid() bool {
 	return p.valid && p.iter.Valid()
 }
 
-func (p *prefixedEphemeralIterator) Value() any {
+func (p *prefixedEphemeralIterator) Value() Sized {
 	if !p.valid {
 		panic("prefixIterator invalid, cannot call Value()")
 	}

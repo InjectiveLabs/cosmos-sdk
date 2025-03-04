@@ -25,24 +25,22 @@ func (e *EphemeralStore) Branch() ephemeral.EphemeralCacheKVStore {
 	panic("cannot branch GasEphemeralStore")
 }
 
-func (e *EphemeralStore) Get(key []byte) any {
+func (e *EphemeralStore) Get(key []byte) ephemeral.Sized {
 	e.gasMeter.ConsumeGas(e.gasConfig.ReadCostFlat, types.GasReadCostFlatDesc)
 	value := e.parent.Get(key)
 
 	// TODO overflow-safe math?
 	e.gasMeter.ConsumeGas(e.gasConfig.ReadCostPerByte*types.Gas(len(key)), types.GasReadPerByteDesc)
-	// FIXME: how to get the length of value? (proto.Size()?)
-	// e.gasMeter.ConsumeGas(e.gasConfig.ReadCostPerByte*types.Gas(len(value)), types.GasReadPerByteDesc)
+	e.gasMeter.ConsumeGas(e.gasConfig.ReadCostPerByte*types.Gas(value.Size()), types.GasReadPerByteDesc)
 
 	return value
 }
 
-func (e *EphemeralStore) Set(key []byte, value any) {
+func (e *EphemeralStore) Set(key []byte, value ephemeral.Sized) {
 	e.gasMeter.ConsumeGas(e.gasConfig.WriteCostFlat, types.GasWriteCostFlatDesc)
 	// TODO overflow-safe math?
 	e.gasMeter.ConsumeGas(e.gasConfig.WriteCostPerByte*types.Gas(len(key)), types.GasWritePerByteDesc)
-	// FIXME: how to get the length of value? (proto.Size()?)
-	// e.gasMeter.ConsumeGas(e.gasConfig.WriteCostPerByte*types.Gas(len(value)), types.GasWritePerByteDesc)
+	e.gasMeter.ConsumeGas(e.gasConfig.WriteCostPerByte*types.Gas(value.Size()), types.GasWritePerByteDesc)
 	e.parent.Set(key, value)
 }
 
@@ -87,7 +85,7 @@ func (e *ephemeralGasIterator) Key() []byte {
 	return e.iterator.Key()
 }
 
-func (e *ephemeralGasIterator) Value() any {
+func (e *ephemeralGasIterator) Value() ephemeral.Sized {
 	return e.iterator.Value()
 }
 
@@ -107,11 +105,10 @@ func (e *ephemeralGasIterator) Close() error {
 func (e *ephemeralGasIterator) consumeSeekGas() {
 	if e.Valid() {
 		key := e.Key()
-		// FIXME: how to get the length of value? (proto.Size()?)
-		// value := e.Value()
+		value := e.Value()
 
 		e.gasMeter.ConsumeGas(e.gasConfig.ReadCostPerByte*types.Gas(len(key)), types.GasValuePerByteDesc)
-		// gi.gasMeter.ConsumeGas(gi.gasConfig.ReadCostPerByte*types.Gas(len(value)), types.GasValuePerByteDesc)
+		e.gasMeter.ConsumeGas(e.gasConfig.ReadCostPerByte*types.Gas(value.Size()), types.GasValuePerByteDesc)
 	}
 	e.gasMeter.ConsumeGas(e.gasConfig.IterNextCostFlat, types.GasIterNextCostFlatDesc)
 }

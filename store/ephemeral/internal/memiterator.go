@@ -7,13 +7,13 @@ import (
 	"github.com/tidwall/btree"
 )
 
-var _ TypedEphemeralIterator[any] = (*memIterator)(nil)
+var _ TypedEphemeralIterator[Sized] = (*memIterator)(nil)
 
 // memIterator iterates over iterKVCache items.
 // if value is nil, means it was deleted.
 // Implements Iterator.
 type memIterator struct {
-	iter btree.IterG[item[any]]
+	iter btree.IterG[item[Sized]]
 
 	start     []byte
 	end       []byte
@@ -26,13 +26,13 @@ func newMemIterator(start, end []byte, items BTree, ascending bool) *memIterator
 	var valid bool
 	if ascending {
 		if start != nil {
-			valid = iter.Seek(newItem[any](start, nil))
+			valid = iter.Seek(newItem[Sized](start, nil))
 		} else {
 			valid = iter.First()
 		}
 	} else {
 		if end != nil {
-			valid = iter.Seek(newItem[any](end, nil))
+			valid = iter.Seek(newItem[Sized](end, nil))
 			if !valid {
 				valid = iter.Last()
 			} else {
@@ -104,10 +104,18 @@ func (mi *memIterator) keyInRange(key []byte) bool {
 }
 
 func (mi *memIterator) Key() []byte {
+	if !mi.Valid() {
+		return nil
+	}
+
 	return mi.iter.Item().key
 }
 
-func (mi *memIterator) Value() any {
+func (mi *memIterator) Value() Sized {
+	if !mi.Valid() {
+		return nil
+	}
+
 	return mi.iter.Item().value
 }
 

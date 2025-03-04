@@ -47,9 +47,9 @@ func (e *EphemeralCacheKV) Write() {
 	}
 }
 
-func (e *EphemeralCacheKV) Set(key []byte, value any) {
+func (e *EphemeralCacheKV) Set(key []byte, value Sized) {
 	e.mtx.Lock()
-	e.cacheBTree.Set(key, &value)
+	e.cacheBTree.Set(key, value)
 	e.mtx.Unlock()
 }
 
@@ -59,7 +59,7 @@ func (e *EphemeralCacheKV) Delete(key []byte) {
 	e.mtx.Unlock()
 }
 
-func (e *EphemeralCacheKV) Get(key []byte) any {
+func (e *EphemeralCacheKV) Get(key []byte) Sized {
 	e.mtx.RLock()
 	cached := e.cacheBTree.Get(key)
 	e.mtx.RUnlock()

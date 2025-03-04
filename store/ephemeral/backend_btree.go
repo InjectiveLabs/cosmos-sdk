@@ -56,7 +56,7 @@ func (e *EphemeralBackendBTree) Commit() {
 	e.batch.Clear()
 }
 
-func (e *EphemeralBackendBTree) Get(key []byte) any {
+func (e *EphemeralBackendBTree) Get(key []byte) Sized {
 	e.mtx.RLock()
 	val := e.batch.Get(key)
 	e.mtx.RUnlock()
@@ -70,9 +70,9 @@ func (e *EphemeralBackendBTree) Get(key []byte) any {
 	return e.readOnlyBTree.Load().Get(key)
 }
 
-func (e *EphemeralBackendBTree) Set(key []byte, value any) {
+func (e *EphemeralBackendBTree) Set(key []byte, value internal.Sized) {
 	e.mtx.Lock()
-	e.batch.Set(key, &value)
+	e.batch.Set(key, value)
 	e.mtx.Unlock()
 }
 

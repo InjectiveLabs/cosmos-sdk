@@ -2,23 +2,23 @@ package ephemeral
 
 import "cosmossdk.io/store/ephemeral/internal"
 
-type TypedEphemeralStore[T any] interface {
-	Get(key []byte) *T
+type TypedEphemeralStore[T Sized] interface {
+	Get(key []byte) T
 
-	Set(key []byte, value *T)
+	Set(key []byte, value T)
 	Delete(key []byte)
 
 	Iterator(start, end []byte) TypedEphemeralIterator[T]
 	ReverseIterator(start, end []byte) TypedEphemeralIterator[T]
 }
 
-var _ TypedEphemeralStore[any] = (*typedEphemeralKVStore[any])(nil)
+var _ TypedEphemeralStore[Sized] = (*typedEphemeralKVStore[Sized])(nil)
 
-type typedEphemeralKVStore[T any] struct {
+type typedEphemeralKVStore[T Sized] struct {
 	store EphemeralKVStore
 }
 
-func NewTypedEpeheralKVStore[T any](
+func NewTypedEpeheralKVStore[T Sized](
 	prefix []byte,
 	ephemeralStore EphemeralKVStore,
 ) TypedEphemeralStore[T] {
@@ -27,15 +27,17 @@ func NewTypedEpeheralKVStore[T any](
 	}
 }
 
-func (t *typedEphemeralKVStore[T]) Get(key []byte) *T {
+func (t *typedEphemeralKVStore[T]) Get(key []byte) T {
 	v := t.store.Get(key)
 	if v != nil {
-		return v.(*T)
+		return v.(any).(T)
 	}
-	return nil
+
+	var zero T
+	return zero
 }
 
-func (t *typedEphemeralKVStore[T]) Set(key []byte, value *T) {
+func (t *typedEphemeralKVStore[T]) Set(key []byte, value T) {
 	t.store.Set(key, value)
 }
 

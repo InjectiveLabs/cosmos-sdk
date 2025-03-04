@@ -1,5 +1,7 @@
 package ephemeral
 
+import "cosmossdk.io/store/ephemeral/internal"
+
 type (
 	// EphemeralCommitKVStore acts as a Committer, recording the changes made so far
 	// in memory (within rootmulti.Store) that persists throughout the process.
@@ -26,9 +28,9 @@ type (
 	// Values are stored as `any` type, allowing flexible storage and management of various data types.
 	EphemeralKVStore interface {
 		// value = nil -> not found
-		Get(key []byte) any
+		Get(key []byte) Sized
 		//
-		Set(key []byte, value any)
+		Set(key []byte, value Sized)
 		//
 		Delete(key []byte)
 
@@ -42,5 +44,6 @@ type (
 	}
 
 	// re-export any iterator
-	EphemeralIterator = TypedEphemeralIterator[any]
+	EphemeralIterator = TypedEphemeralIterator[Sized]
+	Sized             = internal.Sized
 )

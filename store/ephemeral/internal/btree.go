@@ -36,7 +36,7 @@ func NewBTree() *BTree {
 	return &BTree{
 		tree: btree.NewBTreeGOptions[item[Sized]](byKeys, btree.Options{
 			Degree:  bTreeDegree,
-			NoLocks: false,
+			NoLocks: true,
 		}),
 	}
 }

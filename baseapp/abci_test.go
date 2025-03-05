@@ -22,6 +22,7 @@ import (
 	protoio "github.com/cosmos/gogoproto/io"
 	"github.com/cosmos/gogoproto/jsonpb"
 	"github.com/cosmos/gogoproto/proto"
+	gogotypes "github.com/cosmos/gogoproto/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
@@ -228,22 +229,6 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	app.SetBeginBlocker(func(ctx sdk.Context) (sdk.BeginBlock, error) {
-		return sdk.BeginBlock{
-			Events: []abci.Event{
-				{
-					Type: "sometype",
-					Attributes: []abci.EventAttribute{
-						{
-							Key:   "foo",
-							Value: "bar",
-						},
-					},
-				},
-			},
-		}, nil
-	})
-
 	app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
 		ekv := ctx.EphemeralKVStore()
 		typedKV := ephemeral.
@@ -252,9 +237,6 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 		typedKV.Set([]byte("block-1"), &cmtproto.Block{
 			Header: cmtproto.Header{Height: 1},
 		})
-
-		block := typedKV.Get([]byte("block-1"))
-		require.Equal(t, block.Header.Height, int64(1))
 
 		cacheCtx, writeCache := ctx.CacheContext()
 		{
@@ -265,23 +247,34 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 			typedKV.Set([]byte("block-2"), &cmtproto.Block{
 				Header: cmtproto.Header{Height: 2},
 			})
+
+			block2 := typedKV.Get([]byte("block-2"))
+			require.Equal(t, block2.Header.Height, int64(2))
 		}
 		// drop cacheCtx
 		var _ = writeCache
 
-		return sdk.EndBlock{
-			Events: []abci.Event{
-				{
-					Type: "anothertype",
-					Attributes: []abci.EventAttribute{
-						{
-							Key:   "foo",
-							Value: "bar",
-						},
-					},
-				},
-			},
-		}, nil
+		cacheCtx2, writeCache2 := ctx.CacheContext()
+		{
+			ekv := cacheCtx2.EphemeralKVStore()
+			typedKV := ephemeral.
+				NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+
+			typedKV.Set([]byte("block-3"), &cmtproto.Block{
+				Header: cmtproto.Header{Height: 3},
+			})
+
+			block3 := typedKV.Get([]byte("block-3"))
+			require.Equal(t, block3.Header.Height, int64(3))
+		}
+		writeCache2()
+
+		block1 := typedKV.Get([]byte("block-1")) // from ctx
+		require.Equal(t, block1.Header.Height, int64(1))
+		block2 := typedKV.Get([]byte("block-2")) // from cacheCtx
+		require.Nil(t, block2)
+
+		return sdk.EndBlock{}, nil
 	})
 
 	_, err = app.FinalizeBlock(&abci.RequestFinalizeBlock{Height: 3})
@@ -302,6 +295,123 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 
 	val = ephemeral.Get([]byte("block-2"))
 	require.Nil(t, val)
+
+	val = ephemeral.Get([]byte("block-3"))
+	require.NotNil(t, val)
+	require.Equal(t, val.(*cmtproto.Block).Header.Height, int64(3))
+}
+
+func TestABCI_EphemeralWarmpup(t *testing.T) {
+	name := t.Name()
+	db := dbm.NewMemDB()
+
+	warmupCallback := func(
+		ek ephemeral.EphemeralKVStore,
+		db dbm.DB,
+	) error {
+		typedKV := ephemeral.
+			NewTypedEpeheralKVStore[*cmtproto.Block](ek)
+
+		val, err := db.Get([]byte("s/latest"))
+		if err != nil || val == nil {
+			return nil
+		}
+
+		var lastHeight int64
+		require.NoError(t, gogotypes.StdInt64Unmarshal(&lastHeight, val))
+
+		for i := int64(1); i <= lastHeight; i++ {
+			block := &cmtproto.Block{
+				Header: cmtproto.Header{Height: i},
+			}
+			typedKV.Set([]byte(fmt.Sprintf("block-%d", i)), block)
+		}
+
+		return nil
+	}
+
+	newApp := func(db dbm.DB) *baseapp.BaseApp {
+		app := baseapp.NewBaseApp(
+			name,
+			log.NewTestLogger(t),
+			db,
+			nil,
+		)
+		app.SetWarmupEphemeralStore(warmupCallback)
+		app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
+			ekv := ctx.EphemeralKVStore()
+			typedKV := ephemeral.
+				NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+
+			header := ctx.BlockHeader()
+			typedKV.Set(
+				[]byte(
+					fmt.Sprintf("block-%d", header.Height),
+				),
+				&cmtproto.Block{
+					Header: cmtproto.Header{
+						Height: header.Height,
+					},
+				},
+			)
+			return sdk.EndBlock{}, nil
+		})
+
+		require.NoError(t, app.LoadLatestVersion())
+		return app
+	}
+
+	nextBlock := func(app *baseapp.BaseApp) {
+		_, err := app.FinalizeBlock(&abci.RequestFinalizeBlock{
+			Height: app.LastBlockHeight() + 1,
+		})
+		require.NoError(t, err)
+
+		_, err = app.Commit()
+		require.NoError(t, err)
+	}
+
+	app := newApp(db)
+	_, err := app.InitChain(&abci.RequestInitChain{
+		InitialHeight: 1,
+	})
+	require.NoError(t, err)
+
+	for range 10 {
+		nextBlock(app)
+	}
+
+	ephemeralSnapshot := []struct {
+		key   []byte
+		value any
+	}{}
+	{
+		cms := app.CommitMultiStore()
+		ekv := cms.GetEphemeralKVStore()
+		typedEkv := ephemeral.NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+		iter := typedEkv.Iterator(nil, nil)
+		for ; iter.Valid(); iter.Next() {
+			ephemeralSnapshot = append(ephemeralSnapshot, struct {
+				key   []byte
+				value any
+			}{
+				key:   iter.Key(),
+				value: iter.Value(),
+			})
+		}
+		iter.Close()
+	}
+
+	app2 := newApp(db)
+	{ // check ephemeral snapshot
+		cms := app2.CommitMultiStore()
+		ekv := cms.GetEphemeralKVStore()
+		typedEkv := ephemeral.NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+		for _, kv := range ephemeralSnapshot {
+			val := typedEkv.Get(kv.key)
+			require.Equal(t, kv.value, val)
+		}
+	}
 }
 
 func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {

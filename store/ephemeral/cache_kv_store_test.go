@@ -10,7 +10,7 @@ import (
 
 type testItem struct {
 	key  []byte
-	item interface{}
+	item any
 }
 
 type dummyItem[T any] struct {
@@ -38,7 +38,7 @@ func calculateAdditionalSize[T any](v T) int {
 	}
 }
 
-func makeTestItem(key int, value interface{}) *testItem {
+func makeTestItem(key int, value any) *testItem {
 	return &testItem{
 		key:  []byte(fmt.Sprintf("%d", key)),
 		item: value,
@@ -46,19 +46,19 @@ func makeTestItem(key int, value interface{}) *testItem {
 }
 
 func TestEphemeralCacheKVStore(t *testing.T) {
-	testItems := make([]*testItem, 0)
-	testItems = append(testItems, makeTestItem(0, &dummyItem[int]{value: int(1)}))
-	testItems = append(testItems, makeTestItem(1, &dummyItem[int64]{value: int64(2)}))
-	testItems = append(testItems, makeTestItem(2, &dummyItem[string]{value: "3"}))
-	testItems = append(testItems, makeTestItem(3, &dummyItem[[]int]{value: []int{4, 5, 6}}))
-	testItems = append(testItems, makeTestItem(4, &dummyItem[map[string]int]{value: map[string]int{"a": 1, "b": 2}}))
+	testItems := []*testItem{
+		makeTestItem(0, &dummyItem[int]{value: int(1)}),
+		makeTestItem(1, &dummyItem[int64]{value: int64(2)}),
+		makeTestItem(2, &dummyItem[string]{value: "3"}),
+		makeTestItem(3, &dummyItem[[]int]{value: []int{4, 5, 6}}),
+		makeTestItem(4, &dummyItem[map[string]int]{value: map[string]int{"a": 1, "b": 2}}),
+	}
 
 	set := func(store EphemeralKVStore, testItems []*testItem) {
 		for i := 0; i < len(testItems); i++ {
 			sized, ok := testItems[i].item.(Sized)
-			if !ok {
-				t.Fatalf("item must implement Sized interface")
-			}
+			require.True(t, ok, "item must implement Sized interface")
+
 			store.Set(testItems[i].key, sized)
 		}
 	}
@@ -66,22 +66,16 @@ func TestEphemeralCacheKVStore(t *testing.T) {
 	verifyExist := func(store EphemeralKVStore, testItems []*testItem) {
 		for i := 0; i < len(testItems); i++ {
 			item := store.Get(testItems[i].key)
-			if item == nil {
-				t.Fatalf("item should be in the store")
-			}
+			require.NotNil(t, item, "item should be in the store")
 
-			if !reflect.DeepEqual(item, testItems[i].item) {
-				t.Fatalf("item is not equal to the original item")
-			}
+			require.Equal(t, item, testItems[i].item, "item is not equal to the original item")
 		}
 	}
 
 	verifyNotExist := func(store EphemeralKVStore, testItems []*testItem) {
 		for i := 0; i < len(testItems); i++ {
 			item := store.Get(testItems[i].key)
-			if item != nil {
-				t.Fatalf("item should not be in the store")
-			}
+			require.Nil(t, item, "item should not be in the store")
 		}
 	}
 
@@ -169,38 +163,27 @@ func TestEphemeralCacheKVStore(t *testing.T) {
 
 		// this iterator should have the same length as firstCacheItems
 		i := 0
-		for itr.Valid() {
-			if i >= len(firstCacheItems) {
-				t.Fatalf("iterator has more items than the original items")
-			}
+		for ; itr.Valid(); itr.Next() {
+			require.Less(t, i, len(firstCacheItems), "iterator has more items than the original items")
 
 			item := itr.Value()
-			if !reflect.DeepEqual(item, firstCacheItems[i].item) {
-				t.Fatalf("item is not equal to the original item")
-			}
+			require.Equal(t, item, firstCacheItems[i].item, "item is not equal to the original item")
 
-			itr.Next()
 			i++
 		}
 		require.Equal(t, i, len(firstCacheItems))
 
 		// this iterator should have the same length as testItems
 		i = 0
-		for itr2.Valid() {
-			if i >= len(testItems) {
-				t.Fatalf("iterator has more items than the original items")
-			}
+		for ; itr2.Valid(); itr2.Next() {
+			require.Less(t, i, len(testItems), "iterator has more items than the original items")
 
 			item := itr2.Value()
-			if !reflect.DeepEqual(item, testItems[i].item) {
-				t.Fatalf("item is not equal to the original item")
-			}
+			require.Equal(t, item, testItems[i].item, "item is not equal to the original item")
 
-			itr2.Next()
 			i++
 		}
 		require.Equal(t, i, len(testItems))
 
 	})
-
 }

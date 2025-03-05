@@ -72,22 +72,24 @@ type Context struct {
 type Request = Context
 
 // Read-only accessors
-func (c Context) Context() context.Context                      { return c.baseCtx }
-func (c Context) MultiStore() storetypes.MultiStore             { return c.ms }
-func (c Context) BlockHeight() int64                            { return c.header.Height }
-func (c Context) BlockTime() time.Time                          { return c.header.Time }
-func (c Context) ChainID() string                               { return c.chainID }
-func (c Context) TxBytes() []byte                               { return c.txBytes }
-func (c Context) Logger() log.Logger                            { return c.logger }
-func (c Context) VoteInfos() []abci.VoteInfo                    { return c.voteInfo }
-func (c Context) GasMeter() storetypes.GasMeter                 { return c.gasMeter }
-func (c Context) BlockGasMeter() storetypes.GasMeter            { return c.blockGasMeter }
-func (c Context) IsCheckTx() bool                               { return c.checkTx }
-func (c Context) IsReCheckTx() bool                             { return c.recheckTx }
-func (c Context) IsSigverifyTx() bool                           { return c.sigverifyTx }
-func (c Context) ExecMode() ExecMode                            { return c.execMode }
-func (c Context) MinGasPrices() DecCoins                        { return c.minGasPrice }
-func (c Context) EventManager() EventManagerI                   { return c.eventManager }
+func (c Context) Context() context.Context           { return c.baseCtx }
+func (c Context) MultiStore() storetypes.MultiStore  { return c.ms }
+func (c Context) BlockHeight() int64                 { return c.header.Height }
+func (c Context) BlockTime() time.Time               { return c.header.Time }
+func (c Context) ChainID() string                    { return c.chainID }
+func (c Context) TxBytes() []byte                    { return c.txBytes }
+func (c Context) Logger() log.Logger                 { return c.logger }
+func (c Context) VoteInfos() []abci.VoteInfo         { return c.voteInfo }
+func (c Context) GasMeter() storetypes.GasMeter      { return c.gasMeter }
+func (c Context) BlockGasMeter() storetypes.GasMeter { return c.blockGasMeter }
+func (c Context) IsCheckTx() bool                    { return c.checkTx }
+func (c Context) IsReCheckTx() bool                  { return c.recheckTx }
+func (c Context) IsSigverifyTx() bool                { return c.sigverifyTx }
+func (c Context) ExecMode() ExecMode                 { return c.execMode }
+func (c Context) MinGasPrices() DecCoins             { return c.minGasPrice }
+func (c Context) EventManager() EventManagerI {
+	return &EventPlaceholderManager{c.eventManager, c.publishEventManager}
+}
 func (c Context) PublishEventManager() PublishEventManagerI     { return c.publishEventManager }
 func (c Context) Priority() int64                               { return c.priority }
 func (c Context) KVGasConfig() storetypes.GasConfig             { return c.kvGasConfig }
@@ -368,7 +370,13 @@ func (c Context) CacheContext() (cc Context, writeCache func()) {
 	cc = c.WithMultiStore(cms).WithEventManager(NewEventManager()).WithPublishEventManager(NewPublishEventManager())
 
 	writeCache = func() {
-		c.EventManager().EmitEvents(cc.EventManager().Events())
+		eventManager := c.EventManager()
+		// EventPlaceholderManager already emitted event placeholders to the PublishEventManager
+		// so we do not emit them again by unwrapping it.
+		if eventManager.(*EventPlaceholderManager) != nil {
+			eventManager = eventManager.(*EventPlaceholderManager).eventManager
+		}
+		eventManager.EmitEvents(cc.EventManager().Events())
 		c.PublishEventManager().EmitEvents(cc.PublishEventManager().Events())
 		cms.Write()
 	}

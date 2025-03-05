@@ -39,28 +39,3 @@ type PublishEvents []PublishEvent
 func EmptyPublishEvents() PublishEvents {
 	return make(PublishEvents, 0)
 }
-
-var _ PublishEvent = (*PublishEventString)(nil)
-
-type PublishEventString struct {
-	data string
-}
-
-func NewPublishEventString(data string) PublishEventString {
-	return PublishEventString{
-		data: data,
-	}
-}
-
-func (e PublishEventString) Serialize() []byte {
-	return []byte(e.data)
-}
-
-func DecodeEvent(bz []byte, evt *PublishEventString) error {
-	evt.data = string(bz)
-	return nil
-}
-
-func (e PublishEventString) ToString() string {
-	return e.data
-}

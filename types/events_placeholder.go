@@ -20,11 +20,11 @@ func NewTypedEventPlaceholder(tev proto.Message) AbciEventPlaceholder {
 }
 
 func (e AbciEventPlaceholder) ToString() string {
-	return e.typ
+	return "abci event: " + e.typ
 }
 
 func (e AbciEventPlaceholder) Serialize() []byte {
-	return []byte(e.typ)
+	return []byte("abci event: " + e.typ)
 }
 
 var _ EventManagerI = (*EventPlaceholderManager)(nil)

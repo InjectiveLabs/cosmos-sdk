@@ -400,7 +400,7 @@ func (app *BaseApp) SetGRPCQueryRouter(grpcQueryRouter *GRPCQueryRouter) {
 	app.grpcQueryRouter = grpcQueryRouter
 }
 
-func (app *BaseApp) SetWarmupEphemeralStore(cb func(ephemeral.EphemeralKVStore, storetypes.StoreKey, storetypes.KVStore) error) {
+func (app *BaseApp) SetWarmupEphemeralStore(cb func(ephemeral.EphemeralKVStore, dbm.DB) error) {
 	if app.sealed {
 		panic("SetWarmupEphemeralStore() on sealed BaseApp")
 	}

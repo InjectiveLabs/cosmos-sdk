@@ -416,6 +416,56 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 	require.NoError(t, app2.Close())
 }
 
+type testItem struct {
+	str string
+}
+
+func (t *testItem) Size() int {
+	return len(t.str)
+}
+
+func TestABCI_Simple_Iterator_With_EphemeralCacheKVStore(t *testing.T) {
+	name := t.Name()
+	db := dbm.NewMemDB()
+	app := baseapp.NewBaseApp(name, log.NewTestLogger(t), db, nil)
+
+	_, err := app.InitChain(
+		&abci.RequestInitChain{
+			InitialHeight: 3,
+		},
+	)
+	require.NoError(t, err)
+
+	ctx := sdk.NewContext(app.CommitMultiStore(), cmtproto.Header{
+		Height:  1,
+		ChainID: "test-chain-id",
+	}, false, log.NewNopLogger())
+
+	key := []byte("b")
+	value := &testItem{
+		str: "hello",
+	}
+
+	ctx.EphemeralKVStore().Set(key, value)
+
+	ctx.EphemeralKVStore().(ephemeral.EphemeralCommitKVStore).Commit()
+
+	cacheCtx1, _ := ctx.CacheContext()
+	cacheCtx2, _ := cacheCtx1.CacheContext()
+
+	val := cacheCtx2.EphemeralKVStore().Get(key)
+
+	require.Equal(t, value, val)
+
+	iter := cacheCtx2.EphemeralKVStore().Iterator(nil, nil)
+	values := make([]string, 0)
+	for ; iter.Valid(); iter.Next() {
+		values = append(values, string(iter.Value().(*testItem).str))
+	}
+
+	require.Equal(t, len(values), 1)
+}
+
 func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	name := t.Name()
 	db := dbm.NewMemDB()

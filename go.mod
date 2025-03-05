@@ -201,9 +201,9 @@ replace cosmossdk.io/api => ./api
 replace (
 	cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v1.1.1-0.20250303163942-1853f781be39
 	// TODO(sainoe) => figure out if the three imports above are needed
-	cosmossdk.io/x/evidence => github.com/InjectiveLabs/cosmos-sdk/x/evidence v1.1.1-0.20250303163942-1853f781be39
-	cosmossdk.io/x/feegrant => github.com/InjectiveLabs/cosmos-sdk/x/feegrant v1.1.1-0.20250303163942-1853f781be39
-	cosmossdk.io/x/upgrade => github.com/InjectiveLabs/cosmos-sdk/x/upgrade v1.1.1-0.20250303163942-1853f781be39
+	cosmossdk.io/x/evidence => ./x/evidence
+	cosmossdk.io/x/feegrant => ./x/feegrant
+	cosmossdk.io/x/upgrade => ./x/upgrade
 
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0

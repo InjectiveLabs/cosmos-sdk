@@ -401,6 +401,7 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 		}
 		iter.Close()
 	}
+	require.NoError(t, app.Close())
 
 	app2 := newApp(db)
 	{ // check ephemeral snapshot
@@ -412,6 +413,7 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 			require.Equal(t, kv.value, val)
 		}
 	}
+	require.NoError(t, app2.Close())
 }
 
 func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {

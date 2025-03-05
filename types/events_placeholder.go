@@ -44,7 +44,7 @@ func (e *EventPlaceholderManager) EmitEvent(event Event) {
 }
 
 func (e *EventPlaceholderManager) EmitEvents(events Events) {
-	wrappers := make(PublishEvents, len(events))
+	wrappers := make(PublishEvents, 0, len(events))
 	for _, event := range events {
 		wrappers = append(wrappers, NewAbciEventPlaceholder(event))
 	}
@@ -58,7 +58,7 @@ func (e *EventPlaceholderManager) EmitTypedEvent(tev proto.Message) error {
 }
 
 func (e *EventPlaceholderManager) EmitTypedEvents(tevs ...proto.Message) error {
-	wrappers := make(PublishEvents, len(tevs))
+	wrappers := make(PublishEvents, 0, len(tevs))
 	for _, tev := range tevs {
 		wrappers = append(wrappers, NewTypedEventPlaceholder(tev))
 	}

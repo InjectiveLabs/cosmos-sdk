@@ -27,6 +27,7 @@ import (
 
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
+	"cosmossdk.io/store/ephemeral"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 	"cosmossdk.io/store/snapshots"
 	snapshottypes "cosmossdk.io/store/snapshots/types"
@@ -213,6 +214,77 @@ func TestABCI_FinalizeBlock_WithInitialHeight(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, int64(3), app.LastBlockHeight())
+}
+
+func TestEphemeralCacheContextLifecycle(t *testing.T) {
+	name := t.Name()
+	db := dbm.NewMemDB()
+	app := baseapp.NewBaseApp(name, log.NewTestLogger(t), db, nil)
+
+	_, err := app.InitChain(
+		&abci.RequestInitChain{
+			InitialHeight: 3,
+		},
+	)
+	require.NoError(t, err)
+
+	app.SetBeginBlocker(func(ctx sdk.Context) (sdk.BeginBlock, error) {
+		return sdk.BeginBlock{
+			Events: []abci.Event{
+				{
+					Type: "sometype",
+					Attributes: []abci.EventAttribute{
+						{
+							Key:   "foo",
+							Value: "bar",
+						},
+					},
+				},
+			},
+		}, nil
+	})
+
+	app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
+		ekv := ctx.EphemeralKVStore()
+		typedKV := ephemeral.
+			NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+
+		typedKV.Set([]byte("block-1"), &cmtproto.Block{
+			Header: cmtproto.Header{Height: 1},
+		})
+
+		block := typedKV.Get([]byte("block-1"))
+		require.Equal(t, block.Header.Height, int64(1))
+
+		return sdk.EndBlock{
+			Events: []abci.Event{
+				{
+					Type: "anothertype",
+					Attributes: []abci.EventAttribute{
+						{
+							Key:   "foo",
+							Value: "bar",
+						},
+					},
+				},
+			},
+		}, nil
+	})
+
+	_, err = app.FinalizeBlock(&abci.RequestFinalizeBlock{Height: 3})
+	require.NoError(t, err)
+
+	cms := app.CommitMultiStore()
+	ephemeral := cms.GetEphemeralKVStore()
+	val := ephemeral.Get([]byte("block-1"))
+	require.Nil(t, val)
+
+	_, err = app.Commit()
+	require.NoError(t, err)
+
+	require.Equal(t, int64(3), app.LastBlockHeight())
+	val = ephemeral.Get([]byte("block-1"))
+	require.Equal(t, val.(*cmtproto.Block).Header.Height, int64(1))
 }
 
 func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {

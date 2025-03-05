@@ -15,19 +15,35 @@ func NewEphemeralBackendBTree() *EphemeralBackendBTree {
 
 	return &EphemeralBackendBTree{
 		readOnlyBTree: btree,
-		batch:         internal.NewBTree(),
 
+		batch: make([]struct {
+			key   []byte
+			value Sized
+			op    operation
+		}, 0),
 		mtx: &sync.RWMutex{},
 	}
 }
 
-type EphemeralBackendBTree struct {
-	readOnlyBTree *atomic.Pointer[internal.BTree]
+type (
+	EphemeralBackendBTree struct {
+		readOnlyBTree *atomic.Pointer[internal.BTree]
 
-	batch *internal.BTree
+		batch []struct {
+			key   []byte
+			value Sized
+			op    operation
+		}
+		mtx *sync.RWMutex
+	}
 
-	mtx *sync.RWMutex
-}
+	operation int8
+)
+
+const (
+	operationSet operation = iota
+	operationDelete
+)
 
 func (e *EphemeralBackendBTree) Branch() EphemeralCacheKVStore {
 	return NewEphemeralCacheKV(e)
@@ -37,81 +53,70 @@ func (e *EphemeralBackendBTree) Commit() {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
-	iter, err := e.batch.Iterator(nil, nil)
-	if err != nil {
-		panic(err)
-	}
-	defer iter.Close()
-
 	newTree := e.readOnlyBTree.Load().Copy()
-	for ; iter.Valid(); iter.Next() {
-		if internal.IsTombstone(iter.Value()) {
-			newTree.Delete(iter.Key())
-		} else {
-			newTree.Set(iter.Key(), iter.Value())
+	for i := 0; i < len(e.batch); i++ {
+		switch e.batch[i].op {
+		case operationSet:
+			newTree.Set(e.batch[i].key, e.batch[i].value)
+		case operationDelete:
+			newTree.Delete(e.batch[i].key)
 		}
 	}
 
 	e.readOnlyBTree.Store(newTree)
-	e.batch.Clear()
+	e.batch = make([]struct {
+		key   []byte
+		value Sized
+		op    operation
+	}, 0)
 }
 
 func (e *EphemeralBackendBTree) Get(key []byte) Sized {
-	e.mtx.RLock()
-	val := e.batch.Get(key)
-	e.mtx.RUnlock()
-	if val != nil {
-		if internal.IsTombstone(val) {
-			return nil
-		}
-		return val
-	}
-
 	return e.readOnlyBTree.Load().Get(key)
 }
 
 func (e *EphemeralBackendBTree) Set(key []byte, value internal.Sized) {
 	e.mtx.Lock()
-	e.batch.Set(key, value)
+	e.batch = append(e.batch, struct {
+		key   []byte
+		value Sized
+		op    operation
+	}{
+		key:   key,
+		value: value,
+		op:    operationSet,
+	})
 	e.mtx.Unlock()
 }
 
 func (e *EphemeralBackendBTree) Delete(key []byte) {
 	e.mtx.Lock()
-	e.batch.Set(key, internal.NewTombstone())
+	e.batch = append(e.batch, struct {
+		key   []byte
+		value Sized
+		op    operation
+	}{
+		key:   key,
+		value: nil,
+		op:    operationDelete,
+	})
 	e.mtx.Unlock()
 }
 
 func (e *EphemeralBackendBTree) Iterator(start []byte, end []byte) EphemeralIterator {
-	mainIter, err := e.readOnlyBTree.Load().Iterator(start, end)
+	iter, err := e.readOnlyBTree.Load().Iterator(start, end)
 	if err != nil {
 		panic(err)
 	}
 
-	e.mtx.RLock()
-	batchTree := e.batch.Copy()
-	e.mtx.RUnlock()
-	batchIter, err := batchTree.Iterator(start, end)
-	if err != nil {
-		panic(err)
-	}
-
-	return internal.NewCacheMergeIterator(mainIter, batchIter, true)
+	return iter
 }
 
 func (e *EphemeralBackendBTree) ReverseIterator(start []byte, end []byte) EphemeralIterator {
-	mainIter, err := e.readOnlyBTree.Load().ReverseIterator(start, end)
+	iter, err := e.readOnlyBTree.Load().ReverseIterator(start, end)
 	if err != nil {
 		panic(err)
 	}
 
-	e.mtx.RLock()
-	batchTree := e.batch.Copy()
-	e.mtx.RUnlock()
-	batchIter, err := batchTree.ReverseIterator(start, end)
-	if err != nil {
-		panic(err)
-	}
-
-	return internal.NewCacheMergeIterator(mainIter, batchIter, false)
+	return iter
 }

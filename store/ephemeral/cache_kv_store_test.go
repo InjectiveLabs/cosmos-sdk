@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type testItem struct {
@@ -133,4 +135,72 @@ func TestEphemeralCacheKVStore(t *testing.T) {
 		// Get from EphemeralBackend
 		verifyExist(eCommitKVStore, testItems)
 	})
+
+	t.Run("Branch: Write & Commit with living iterator", func(t *testing.T) {
+		eCommitKVStore := NewEphemeralBackend()
+
+		// Set to first cache
+		firstCacheKVStore := eCommitKVStore.Branch()
+		set(firstCacheKVStore, testItems[:3])
+
+		// Write & Commit
+		firstCacheKVStore.Write()
+		eCommitKVStore.Commit()
+
+		// Get from EphemeralBackend
+		firstCacheItems := testItems[:3]
+		verifyExist(eCommitKVStore, firstCacheItems)
+
+		// get iterator with the first cache items
+		itr := eCommitKVStore.Iterator(nil, nil)
+		defer itr.Close()
+
+		// Set to second cache
+		secondCacheKVStore := eCommitKVStore.Branch()
+		set(secondCacheKVStore, testItems[3:])
+
+		// Write & Commit
+		secondCacheKVStore.Write()
+		eCommitKVStore.Commit()
+
+		// get iterator with the test items
+		itr2 := eCommitKVStore.Iterator(nil, nil)
+		defer itr2.Close()
+
+		// this iterator should have the same length as firstCacheItems
+		i := 0
+		for itr.Valid() {
+			if i >= len(firstCacheItems) {
+				t.Fatalf("iterator has more items than the original items")
+			}
+
+			item := itr.Value()
+			if !reflect.DeepEqual(item, firstCacheItems[i].item) {
+				t.Fatalf("item is not equal to the original item")
+			}
+
+			itr.Next()
+			i++
+		}
+		require.Equal(t, i, len(firstCacheItems))
+
+		// this iterator should have the same length as testItems
+		i = 0
+		for itr2.Valid() {
+			if i >= len(testItems) {
+				t.Fatalf("iterator has more items than the original items")
+			}
+
+			item := itr2.Value()
+			if !reflect.DeepEqual(item, testItems[i].item) {
+				t.Fatalf("item is not equal to the original item")
+			}
+
+			itr2.Next()
+			i++
+		}
+		require.Equal(t, i, len(testItems))
+
+	})
+
 }

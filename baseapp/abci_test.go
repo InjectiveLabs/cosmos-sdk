@@ -466,6 +466,74 @@ func TestABCI_Simple_Iterator_With_EphemeralCacheKVStore(t *testing.T) {
 	require.Equal(t, len(values), 1)
 }
 
+func TestABCI_FinalizeBlock_MultipleCacheContexts(t *testing.T) {
+	name := t.Name()
+
+	db, x := dbm.NewDB("hehe", dbm.GoLevelDBBackend, t.TempDir())
+	require.NoError(t, x)
+	app := baseapp.NewBaseApp(name, log.NewTestLogger(t), db, nil)
+
+	// create stub store; use actual KVStoreKey
+	testStore := storetypes.NewKVStoreKey("test")
+	app.MountStore(testStore, storetypes.StoreTypeIAVL)
+	app.InitChain(&abci.RequestInitChain{
+		Time:            time.Now(),
+		ChainId:         "testestest",
+		ConsensusParams: &cmtproto.ConsensusParams{},
+		Validators:      []abci.ValidatorUpdate{},
+		AppStateBytes:   []byte{},
+		InitialHeight:   0,
+	})
+	require.NoError(t, app.LoadLatestVersion())
+
+	_, err := app.InitChain(
+		&abci.RequestInitChain{
+			InitialHeight: 3,
+		},
+	)
+	require.NoError(t, err)
+
+	// create root context
+	ctx := sdk.NewContext(app.CommitMultiStore(), cmtproto.Header{
+		Height:  1,
+		ChainID: "test-chain-id",
+	}, false, log.NewNopLogger())
+
+	// create 2 branches stemming from the same ctx
+	// at this point, the ctx1 and ctx2 would be using ctx as the "parent" in its cms
+	ctx1, write1 := ctx.CacheContext()
+	ctx2, write2 := ctx.CacheContext()
+
+	// write something to ctx1 and ctx2
+	// NOTE: this actually works because current cacheContext merges them with write logs????
+	// if CoW is used this usage won't work because ctx1 and ctx2 are pre-copied when CacheContext() is called
+	// and merging them is very hard as we lose the diffs
+	//
+	// below example is using KVStore instead of EphemeralStore - but should be enough to see
+	// that it is an allowed usage, as long as keys are ordered and writes are NOT concurrent
+	for i := 0; i < 10; i++ {
+		ctx1.KVStore(testStore).Set([]byte(fmt.Sprintf("test-to-ctx1-%10d", i*10)), []byte{0x0})
+		ctx2.KVStore(testStore).Set([]byte(fmt.Sprintf("test-to-ctx2-%10d", i*7)), []byte{0x0})
+	}
+	write1()
+	write2()
+
+	app.FinalizeBlock(&abci.RequestFinalizeBlock{Height: 1})
+	_, err = app.Commit()
+	require.NoError(t, err)
+
+	// get cms after commit
+	kvs := app.CommitMultiStore().GetKVStore(testStore)
+	it := kvs.Iterator(nil, nil)
+	defer it.Close()
+
+	for it.Valid() {
+		fmt.Println(string(it.Key()))
+
+		it.Next()
+	}
+}
+
 func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	name := t.Name()
 	db := dbm.NewMemDB()

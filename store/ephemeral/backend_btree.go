@@ -21,7 +21,7 @@ func NewEphemeralBackendBTree() *EphemeralBackendBTree {
 			value Sized
 			op    operation
 		}, 0),
-		mtx: &sync.RWMutex{},
+		mtx: &sync.Mutex{},
 	}
 }
 
@@ -34,7 +34,7 @@ type (
 			value Sized
 			op    operation
 		}
-		mtx *sync.RWMutex
+		mtx *sync.Mutex
 	}
 
 	operation int8

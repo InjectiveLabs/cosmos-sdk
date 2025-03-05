@@ -216,7 +216,7 @@ func TestABCI_FinalizeBlock_WithInitialHeight(t *testing.T) {
 	require.Equal(t, int64(3), app.LastBlockHeight())
 }
 
-func TestEphemeralCacheContextLifecycle(t *testing.T) {
+func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 	name := t.Name()
 	db := dbm.NewMemDB()
 	app := baseapp.NewBaseApp(name, log.NewTestLogger(t), db, nil)
@@ -256,6 +256,19 @@ func TestEphemeralCacheContextLifecycle(t *testing.T) {
 		block := typedKV.Get([]byte("block-1"))
 		require.Equal(t, block.Header.Height, int64(1))
 
+		cacheCtx, writeCache := ctx.CacheContext()
+		{
+			ekv := cacheCtx.EphemeralKVStore()
+			typedKV := ephemeral.
+				NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+
+			typedKV.Set([]byte("block-2"), &cmtproto.Block{
+				Header: cmtproto.Header{Height: 2},
+			})
+		}
+		// drop cacheCtx
+		var _ = writeCache
+
 		return sdk.EndBlock{
 			Events: []abci.Event{
 				{
@@ -281,10 +294,14 @@ func TestEphemeralCacheContextLifecycle(t *testing.T) {
 
 	_, err = app.Commit()
 	require.NoError(t, err)
-
 	require.Equal(t, int64(3), app.LastBlockHeight())
+
 	val = ephemeral.Get([]byte("block-1"))
+	require.NotNil(t, val)
 	require.Equal(t, val.(*cmtproto.Block).Header.Height, int64(1))
+
+	val = ephemeral.Get([]byte("block-2"))
+	require.Nil(t, val)
 }
 
 func TestABCI_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {

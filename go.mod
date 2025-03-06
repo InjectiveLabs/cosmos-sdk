@@ -209,7 +209,8 @@ replace (
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
 
 	// TODO(sainoe) => replace with Injective Comet v1.0.1 + DOG & Mempool
-	// github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v0.38.11-inj-0
+	github.com/cometbft/cometbft => github.com/informalsystems/cometbft-private v1.0.2-0.20250305145255-8ba4960ab7dd
+	github.com/cometbft/cometbft/api => github.com/informalsystems/cometbft-private/api v0.0.0-20250305145255-8ba4960ab7dd
 	// dgrijalva/jwt-go is deprecated and doesn't receive security updates.
 	// TODO: remove it: https://github.com/cosmos/cosmos-sdk/issues/13134
 	github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt/v4 v4.4.2

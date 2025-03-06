@@ -58,7 +58,7 @@ func TestABCI_MultiListener_StateChanges(t *testing.T) {
 	)
 
 	deliverKey := []byte("deliver-key")
-	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey})
+	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey, false})
 
 	nBlocks := 3
 	txPerHeight := 5

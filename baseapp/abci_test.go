@@ -564,7 +564,7 @@ func TestABCI_CheckTx(t *testing.T) {
 	anteOpt := func(bapp *baseapp.BaseApp) { bapp.SetAnteHandler(anteHandlerTxTest(t, capKey1, counterKey)) }
 	suite := NewBaseAppSuite(t, anteOpt)
 
-	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, counterKey})
+	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, counterKey, false})
 
 	nTxs := int64(5)
 	_, err := suite.baseApp.InitChain(&abci.RequestInitChain{
@@ -618,7 +618,7 @@ func TestABCI_FinalizeBlock_DeliverTx(t *testing.T) {
 	require.NoError(t, err)
 
 	deliverKey := []byte("deliver-key")
-	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey})
+	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey, false})
 
 	nBlocks := 3
 	txPerHeight := 5
@@ -668,7 +668,7 @@ func TestABCI_FinalizeBlock_MultiMsg(t *testing.T) {
 	require.NoError(t, err)
 
 	deliverKey := []byte("deliver-key")
-	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey})
+	baseapptestutil.RegisterCounterServer(suite.baseApp.MsgServiceRouter(), CounterServerImpl{t, capKey1, deliverKey, false})
 
 	deliverKey2 := []byte("deliver-key2")
 	baseapptestutil.RegisterCounter2Server(suite.baseApp.MsgServiceRouter(), Counter2ServerImpl{t, capKey1, deliverKey2})

@@ -47,7 +47,7 @@ func (app *BaseApp) SimTxFinalizeBlock(txEncoder sdk.TxEncoder, tx sdk.Tx) (sdk.
 		return sdk.GasInfo{}, nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "%s", err)
 	}
 
-	gasInfo, result, _, err := app.runTx(execModeFinalize, bz, nil)
+	gasInfo, result, _, err := app.runTx(execModeFinalize, bz, tx)
 	return gasInfo, result, err
 }
 

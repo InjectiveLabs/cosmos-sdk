@@ -897,7 +897,7 @@ func (app *BaseApp) runTx(mode execMode, txBytes []byte, tx sdk.Tx) (gInfo sdk.G
 	if tx == nil {
 		tx, err = app.txDecoder(txBytes)
 		if err != nil {
-			return sdk.GasInfo{GasUsed: 0, GasWanted: 0}, nil, nil, sdkerrors.ErrTxDecode.Wrap(err.Error())
+			return sdk.GasInfo{}, nil, nil, err
 		}
 	}
 

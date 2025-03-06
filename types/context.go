@@ -87,10 +87,10 @@ func (c Context) IsReCheckTx() bool                  { return c.recheckTx }
 func (c Context) IsSigverifyTx() bool                { return c.sigverifyTx }
 func (c Context) ExecMode() ExecMode                 { return c.execMode }
 func (c Context) MinGasPrices() DecCoins             { return c.minGasPrice }
-func (c Context) EventManager() EventManagerI {
+func (c Context) EventManager() EventManagerI        { return c.eventManager }
+func (c Context) PublishEventManager() PublishEventManagerI {
 	return &EventPlaceholderManager{c.eventManager, c.publishEventManager}
 }
-func (c Context) PublishEventManager() PublishEventManagerI     { return c.publishEventManager }
 func (c Context) Priority() int64                               { return c.priority }
 func (c Context) KVGasConfig() storetypes.GasConfig             { return c.kvGasConfig }
 func (c Context) TransientKVGasConfig() storetypes.GasConfig    { return c.transientKVGasConfig }
@@ -370,14 +370,16 @@ func (c Context) CacheContext() (cc Context, writeCache func()) {
 	cc = c.WithMultiStore(cms).WithEventManager(NewEventManager()).WithPublishEventManager(NewPublishEventManager())
 
 	writeCache = func() {
-		eventManager := c.EventManager()
-		// EventPlaceholderManager already emitted event placeholders to the PublishEventManager
+		c.EventManager().EmitEvents(cc.EventManager().Events())
+
+		pem := c.PublishEventManager()
+		// EventPlaceholderManager already emitted event placeholders to the EventManager
 		// so we do not emit them again by unwrapping it.
-		if eventManager.(*EventPlaceholderManager) != nil {
-			eventManager = eventManager.(*EventPlaceholderManager).eventManager
+		if pem.(*EventPlaceholderManager) != nil {
+			pem = pem.(*EventPlaceholderManager).publishEventManager
 		}
-		eventManager.EmitEvents(cc.EventManager().Events())
-		c.PublishEventManager().EmitEvents(cc.PublishEventManager().Events())
+		pem.EmitEvents(cc.PublishEventManager().Events())
+
 		cms.Write()
 	}
 

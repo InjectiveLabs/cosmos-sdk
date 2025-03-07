@@ -73,6 +73,10 @@ func (t *Tree) NewBatch() EphemeralBatch {
 	}
 }
 
+func (t *Tree) UnsafeSetter() interface{ Set(key []byte, value any) } {
+	return t.root.Load()
+}
+
 // Get retrieves a value for the given key from the current batch.
 func (b *IndexedBatch) Get(key []byte) any {
 	return b.current.reader.Load().Get(key)

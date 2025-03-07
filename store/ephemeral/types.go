@@ -15,6 +15,9 @@ type (
 		// The L1 batch's current btree is created by copying (Copy()) a snapshot of tree.root.
 		// When L1 batch's Commit() is called, it replaces tree.root using atomic.CompareAndSwap().
 		NewBatch() EphemeralBatch
+
+		// directly returns the value for the given key from the tree's reader btree.
+		UnsafeSetter() interface{ Set(key []byte, value any) }
 	}
 
 	// EphemeralBatch defines operations that can be performed on a batch.

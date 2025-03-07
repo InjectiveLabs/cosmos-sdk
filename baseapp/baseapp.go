@@ -502,6 +502,7 @@ func (app *BaseApp) setState(mode execMode, h cmtproto.Header) {
 			WithStreamingManager(app.streamingManager).
 			WithHeaderInfo(headerInfo),
 	}
+	ms.SetHeight(baseState.ctx.BlockHeight())
 
 	switch mode {
 	case execModeCheck:

@@ -15,30 +15,38 @@ type (
 		// When L1 batch's Commit() is called, it replaces tree.root using atomic.CompareAndSwap().
 		NewBatch() EphemeralBatch
 
-		GetSnapshot(height int64) (EphemeralSnapshot, bool)
+		GetSnapshotBatch(height int64) (EphemeralBatch, bool)
 
 		// directly returns the value for the given key from the tree's reader btree.
 		UnsafeSetter() interface{ Set(key []byte, value any) }
 	}
 
-	EphemeralSnapshot interface {
-		Get(key []byte) any
-
-		Iterator(start, end []byte) Iterator
-		ReverseIterator(start, end []byte) Iterator
-	}
-
-	// EphemeralBatch defines operations that can be performed on a batch.
-	EphemeralBatch interface {
-		// NewNestedBatch creates a nested batch on top of the current batch.
-		// It makes a copy (Copy()) of the current batch's btree to create an independent workspace.
-		// The parent field points to the current batch.
-		NewNestedBatch() EphemeralBatch
-
+	EphemeralReader interface {
 		// Get retrieves a value for the given key from the current batch's reader btree.
 		// Returns nil if the key does not exist.
 		Get(key []byte) any
 
+		// Iterator returns an iterator over the key-value pairs in the batch
+		// within the specified range.
+		//
+		// The iterator will include items with key >= start and key < end.
+		// If start is nil, it returns all items from the beginning.
+		// If end is nil, it returns all items until the end.
+		//
+		// If an error occurs during initialization, this method panics.
+		Iterator(start, end []byte) Iterator
+		// ReverseIterator returns an iterator over the key-value pairs in the batch
+		// within the specified range, in reverse order (from end to start).
+		//
+		// The iterator will include items with key >= start and key < end.
+		// If start is nil, it returns all items from the beginning.
+		// If end is nil, it returns all items until the end.
+		//
+		// If an error occurs during initialization, this method panics.
+		ReverseIterator(start, end []byte) Iterator
+	}
+
+	EphemeralWriter interface {
 		// Set adds or updates a key-value pair in the current batch's writer btree.
 		// If the key already exists, its value is overwritten.
 		// The current.writer is a Copy()'d btree.
@@ -60,30 +68,55 @@ type (
 		//   Failure can occur if another goroutine has modified tree.root.
 		//   We assume this case is handled by higher-level usecases.
 		Commit()
+	}
 
-		Iterator(start, end []byte) Iterator
-		ReverseIterator(start, end []byte) Iterator
+	// EphemeralBatch defines operations that can be performed on a batch.
+	EphemeralBatch interface {
+		// NewNestedBatch creates a nested batch on top of the current batch.
+		// It makes a copy (BTree.Copy()) of the current batch's btree to create an independent workspace.
+		// The parent field points to the current batch.
+		NewNestedBatch() EphemeralBatch
 
+		EphemeralReader
+		EphemeralWriter
+
+		// Top-level batch에서만 사용되며, (EphemeralWriter).Commit에서 HeightMap.Set을 호출합니다.
 		SetHeight(height int64)
 	}
 
+	// Iterator defines an interface for traversing key-value pairs in order.
+	// Callers must call Close when done to release any allocated resources.
 	Iterator interface {
+		// Domain returns the start and end keys defining the range of this iterator.
+		// The returned values match what was passed to Iterator() or ReverseIterator().
+		Domain() (start, end []byte)
+
+		// Key returns the current key.
+		// Panics if the iterator is not valid.
 		Key() []byte
+
+		// Value returns the current value.
+		// Panics if the iterator is not valid.
 		Value() any
 
+		// Valid returns whether the iterator is positioned at a valid item.
+		// Once false, Valid() will never return true again.
 		Valid() bool
 
 		// Next moves the iterator to the next item.
+		// If Valid() returns false after this call, the iteration is complete.
 		Next()
 
+		// Close releases any resources associated with the iterator.
+		// It must be called when done using the iterator.
 		Close() error
 	}
 
 	HeightMap interface {
 		//
-		Get(height int64) (EphemeralSnapshot, bool)
+		Get(height int64) (EphemeralStore, bool)
 
 		//
-		Set(height int64, store EphemeralSnapshot)
+		Set(height int64, store EphemeralStore)
 	}
 )

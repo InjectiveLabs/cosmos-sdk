@@ -28,7 +28,7 @@ type Store struct {
 	db             types.CacheKVStore
 	stores         map[types.StoreKey]types.CacheWrap
 	keys           map[string]types.StoreKey
-	ephemeralStore ephemeral.EphemeralCacheKVStore
+	ephemeralStore ephemeral.EphemeralBatch
 
 	traceWriter  io.Writer
 	traceContext types.TraceContext
@@ -42,13 +42,13 @@ var _ types.CacheMultiStore = Store{}
 func NewFromKVStore(
 	store types.KVStore, stores map[types.StoreKey]types.CacheWrapper,
 	keys map[string]types.StoreKey, traceWriter io.Writer, traceContext types.TraceContext,
-	ephermalStore ephemeral.EphemeralKVStore,
+	ephermalStore ephemeral.EphemeralBatch,
 ) Store {
 	cms := Store{
 		db:             cachekv.NewStore(store),
 		stores:         make(map[types.StoreKey]types.CacheWrap, len(stores)),
 		keys:           keys,
-		ephemeralStore: ephemeral.NewEphemeralCacheKV(ephermalStore),
+		ephemeralStore: ephermalStore.NewNestedBatch(),
 
 		traceWriter:  traceWriter,
 		traceContext: traceContext,
@@ -72,12 +72,12 @@ func NewFromKVStore(
 // CacheWrapper objects. Each CacheWrapper store is a branched store.
 func NewStore(
 	db dbm.DB, stores map[types.StoreKey]types.CacheWrapper, keys map[string]types.StoreKey,
-	traceWriter io.Writer, traceContext types.TraceContext, ephemeralStore ephemeral.EphemeralKVStore,
+	traceWriter io.Writer, traceContext types.TraceContext, ephemeralStore ephemeral.EphemeralBatch,
 ) Store {
 	return NewFromKVStore(dbadapter.Store{DB: db}, stores, keys, traceWriter, traceContext, ephemeralStore)
 }
 
-func newCacheMultiStoreFromCMS(cms Store, ecs ephemeral.EphemeralKVStore) Store {
+func newCacheMultiStoreFromCMS(cms Store, ecs ephemeral.EphemeralBatch) Store {
 	stores := make(map[types.StoreKey]types.CacheWrapper)
 	for k, v := range cms.stores {
 		stores[k] = v
@@ -131,7 +131,11 @@ func (cms Store) Write() {
 		store.Write()
 	}
 
-	cms.ephemeralStore.Write()
+	cms.ephemeralStore.Commit()
+}
+
+func (cms Store) SetHeight(version int64) {
+	cms.ephemeralStore.SetHeight(version)
 }
 
 // Implements CacheWrapper.
@@ -176,6 +180,6 @@ func (cms Store) GetKVStore(key types.StoreKey) types.KVStore {
 	return store.(types.KVStore)
 }
 
-func (cms Store) GetEphemeralKVStore() ephemeral.EphemeralKVStore {
+func (cms Store) GetEphemeralKVStore() ephemeral.EphemeralBatch {
 	return cms.ephemeralStore
 }

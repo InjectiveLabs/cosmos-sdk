@@ -306,6 +306,77 @@ func TestUncommittedL1BatchChanges(t *testing.T) {
 	require.Equal(t, "temp-value", val, "New batch should still see key that was deleted in uncommitted batch")
 }
 
+// TestBatchIteratorIsolation verifies that an iterator from one batch does not see
+// write operations performed in another concurrent batch.
+// It demonstrates the point-in-time view property of iterators.
+func TestBatchIteratorIsolation(t *testing.T) {
+	// Create tree with initial data
+	tree := NewTree()
+	setupBatch := tree.NewBatch()
+
+	// Add initial data to tree
+	for i := 0; i < 10; i++ {
+		key := []byte(fmt.Sprintf("init-key-%d", i))
+		value := fmt.Sprintf("init-value-%d", i)
+		setupBatch.Set(key, value)
+	}
+	setupBatch.Commit()
+
+	// Create two L1 batches concurrently - both have same initial view
+	batch1 := tree.NewBatch()
+	batch2 := tree.NewBatch()
+
+	// Verify both batches see the same initial state
+	val1 := batch1.Get([]byte("init-key-5"))
+	val2 := batch2.Get([]byte("init-key-5"))
+	require.Equal(t, val1, val2, "Both batches should start with identical view")
+
+	// Create iterator from batch2 before any modifications
+	iter := batch2.Iterator(nil, nil)
+
+	// Modify data in batch1
+	batch1.Set([]byte("new-key"), "new-value")
+	batch1.Set([]byte("init-key-5"), "modified-in-batch1")
+	batch1.Delete([]byte("init-key-3"))
+
+	// Collect all keys/values from batch2's iterator
+	iteratorPairs := make(map[string]any)
+	for ; iter.Valid(); iter.Next() {
+		iteratorPairs[string(iter.Key())] = iter.Value()
+	}
+
+	// Verify iterator doesn't see batch1's changes
+	require.NotContains(t, iteratorPairs, "new-key", "Iterator should not see keys added in other batch")
+	require.Equal(t, "init-value-5", iteratorPairs["init-key-5"], "Iterator should see original values, not modified")
+	require.Contains(t, iteratorPairs, "init-key-3", "Iterator should still see deleted keys")
+
+	// Verify direct Get on batch2 also doesn't see changes
+	require.Nil(t, batch2.Get([]byte("new-key")), "batch2 Get should not see new key from batch1")
+	require.Equal(t, "init-value-5", batch2.Get([]byte("init-key-5")), "batch2 Get should see original values")
+	require.NotNil(t, batch2.Get([]byte("init-key-3")), "batch2 Get should still see deleted key")
+
+	// Commit batch1
+	batch1.Commit()
+
+	// Verify changes are in the tree
+	require.Equal(t, "new-value", tree.NewBatch().Get([]byte("new-key")), "Tree should have new key after batch1 commit")
+	require.Equal(t, "modified-in-batch1", tree.NewBatch().Get([]byte("init-key-5")), "Tree should have modified value")
+	require.Nil(t, tree.NewBatch().Get([]byte("init-key-3")), "Tree should not have deleted key")
+
+	// Create a new iterator on batch2 and verify it still doesn't see changes
+	// (batch2 maintains its point-in-time view even after batch1 is committed)
+	iter2 := batch2.Iterator(nil, nil)
+
+	iteratorPairs2 := make(map[string]any)
+	for ; iter2.Valid(); iter2.Next() {
+		iteratorPairs2[string(iter2.Key())] = iter2.Value()
+	}
+
+	require.NotContains(t, iteratorPairs2, "new-key", "New iterator should still not see changes from batch1")
+	require.Equal(t, "init-value-5", iteratorPairs2["init-key-5"], "New iterator should see original values")
+	require.Contains(t, iteratorPairs2, "init-key-3", "New iterator should still see deleted key")
+}
+
 // cpu: Apple M2 Pro
 // BenchmarkTreeBatchSet-12    	  244624	      5341 ns/op	   12467 B/op	      34 allocs/op
 func BenchmarkTreeBatchSet(b *testing.B) {

@@ -17,12 +17,8 @@ type (
 		heightMap HeightMap
 	}
 
-	treeSnapshot struct {
-		tree *btree
-	}
-
-	// IndexedBatch implements a copy-on-write batch operation pattern.
-	// Nested batches follow this structure as well, updating their parent's current on Commit.
+	// `IndexedBatch` implements a copy-on-write batch operation pattern.
+	// Nested batches follow this structure as well, updating their parent's current on `Commit()`.
 	IndexedBatch struct {
 		// parent is nil for top-level batches, non-nil for nested batches
 		parent *IndexedBatch
@@ -33,7 +29,10 @@ type (
 		// current reflects changes made during batch operations
 		current *struct {
 			// reader uses copy-on-write snapshot pattern.
-			// It's wrapped in atomic.Pointer for safe concurrent access from other goroutines.
+			// It's wrapped in `atomic.Pointer` for safe concurrent access from other goroutines.
+			//
+			// Since the reader is an immutable object already created as a snapshot,
+			// it should be safe for "read operations" after `Load()`.
 			reader *atomic.Pointer[btree]
 			// writer doesn't need atomic.Pointer as it's used with the single writer assumption.
 			writer *btree
@@ -55,35 +54,13 @@ func NewTree() *Tree {
 	}
 }
 
-func (t *Tree) GetSnapshot(height int64) (EphemeralSnapshot, bool) {
-	store, ok := t.heightMap.Get(height)
+func (t *Tree) GetSnapshotBatch(height int64) (EphemeralBatch, bool) {
+	reader, ok := t.heightMap.Get(height)
 	if !ok {
 		return nil, false
 	}
 
-	return store, true
-}
-
-func (t *treeSnapshot) Get(key []byte) any {
-	return t.tree.Get(key)
-}
-
-func (t *treeSnapshot) Iterator(start, end []byte) Iterator {
-	iter, err := t.tree.Iterator(start, end)
-	if err != nil {
-		panic(err)
-	}
-
-	return iter
-}
-
-func (t *treeSnapshot) ReverseIterator(start, end []byte) Iterator {
-	iter, err := t.tree.ReverseIterator(start, end)
-	if err != nil {
-		panic(err)
-	}
-
-	return iter
+	return reader.NewBatch(), true
 }
 
 // NewBatch creates a top-level batch.
@@ -230,8 +207,11 @@ func (b *IndexedBatch) Commit() {
 		if b.height != 0 {
 			// Update the height map with the new store
 			copiedStore := b.tree.root.Load().Copy()
-			b.tree.heightMap.Set(b.height, &treeSnapshot{
-				tree: copiedStore,
+			ptr := &atomic.Pointer[btree]{}
+			ptr.Store(copiedStore)
+			b.tree.heightMap.Set(b.height, &Tree{
+				root:      ptr,
+				heightMap: newHeightMap(),
 			})
 		}
 

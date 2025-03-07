@@ -12,15 +12,15 @@ func newHeightMap() *heightMap {
 	}
 }
 
-func (hm *heightMap) Get(height int64) (EphemeralSnapshot, bool) {
+func (hm *heightMap) Get(height int64) (EphemeralStore, bool) {
 	store, ok := hm.Load(height)
 	if !ok {
 		return nil, false
 	}
 
-	return store.(EphemeralSnapshot), true
+	return store.(EphemeralStore), true
 }
 
-func (hm *heightMap) Set(height int64, store EphemeralSnapshot) {
+func (hm *heightMap) Set(height int64, store EphemeralStore) {
 	hm.Store(height, store)
 }

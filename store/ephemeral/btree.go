@@ -40,7 +40,16 @@ type (
 
 		height int64
 	}
+
+	UncommittableBatch struct {
+		EphemeralBatch
+	}
 )
+
+func (u *UncommittableBatch) Commit() {
+	// TODO: or make no-op?
+	panic("uncommittable batch cannot be committed")
+}
 
 // NewTree creates a new empty Tree.
 func NewTree() *Tree {
@@ -54,13 +63,15 @@ func NewTree() *Tree {
 	}
 }
 
+// Committing a batch created here is unsafe.
 func (t *Tree) GetSnapshotBatch(height int64) (EphemeralBatch, bool) {
 	reader, ok := t.heightMap.Get(height)
 	if !ok {
 		return nil, false
 	}
 
-	return reader.NewBatch(), true
+	batch := reader.NewBatch()
+	return &UncommittableBatch{batch}, true
 }
 
 // NewBatch creates a top-level batch.

@@ -377,6 +377,125 @@ func TestBatchIteratorIsolation(t *testing.T) {
 	require.Contains(t, iteratorPairs2, "init-key-3", "New iterator should still see deleted key")
 }
 
+// TestHeightMapAndSnapshots verifies the functionality of height maps and snapshot retrieval.
+// It ensures that batches can be created with specific heights and later retrieved correctly.
+func TestHeightMapAndSnapshots(t *testing.T) {
+	// Create tree
+	tree := NewTree()
+
+	// Add data at different heights
+	heights := []int64{10, 20, 30}
+	expectedValues := make(map[int64]string)
+
+	for _, height := range heights {
+		// Create batch with height
+		batch := tree.NewBatch()
+		batch.SetHeight(height)
+
+		// Set height-specific value
+		key := []byte("key")
+		value := fmt.Sprintf("value-at-height-%d", height)
+		batch.Set(key, value)
+
+		// Store expected value for later verification
+		expectedValues[height] = value
+
+		// Commit batch
+		batch.Commit()
+	}
+
+	// Get snapshots at each height and verify values
+	for _, height := range heights {
+		snapshotBatch, found := tree.GetSnapshotBatch(height)
+		require.True(t, found, "Should find snapshot for height %d", height)
+
+		// Check correct value at this height
+		val := snapshotBatch.Get([]byte("key"))
+		require.Equal(t, expectedValues[height], val, "Snapshot at height %d should have correct value", height)
+
+		// Verify we get UncommittableBatch that panics on commit
+		require.Panics(t, func() {
+			snapshotBatch.Commit()
+		}, "Snapshot batch should panic on commit attempt")
+	}
+
+	// Verify requesting non-existent height returns false
+	_, found := tree.GetSnapshotBatch(999)
+	require.False(t, found, "Should not find snapshot for non-existent height")
+
+	// Test that snapshot batches reflect the state at exactly that height
+	// by creating multiple batches at same height with different changes
+	finalHeight := int64(100)
+
+	// First batch at height 100
+	batch1 := tree.NewBatch()
+	batch1.SetHeight(finalHeight)
+	batch1.Set([]byte("multi-key-1"), "first-batch")
+	batch1.Commit()
+
+	// Second batch at height 100 (should overwrite the snapshot)
+	batch2 := tree.NewBatch()
+	batch2.SetHeight(finalHeight)
+	batch2.Set([]byte("multi-key-1"), "second-batch")
+	batch2.Set([]byte("multi-key-2"), "additional-value")
+	batch2.Commit()
+
+	// Get snapshot and verify it reflects the second batch
+	snapshotBatch, found := tree.GetSnapshotBatch(finalHeight)
+	require.True(t, found, "Should find snapshot for final height")
+
+	val := snapshotBatch.Get([]byte("multi-key-1"))
+	require.Equal(t, "second-batch", val, "Snapshot should reflect the latest commit at height")
+
+	val = snapshotBatch.Get([]byte("multi-key-2"))
+	require.Equal(t, "additional-value", val, "Snapshot should contain all keys from last commit")
+}
+
+// TestNestedSnapshotBatches tests behavior with deeply nested batches and height management
+func TestNestedSnapshotBatches(t *testing.T) {
+	tree := NewTree()
+
+	// Create L1 with height 100
+	batchL1 := tree.NewBatch()
+	batchL1.SetHeight(100)
+	batchL1.Set([]byte("key"), "L1-value")
+
+	// Create L2 from L1
+	batchL2 := batchL1.NewNestedBatch()
+	batchL2.Set([]byte("key"), "L2-value")
+
+	// Create L3 from L2
+	batchL3 := batchL2.NewNestedBatch()
+	batchL3.Set([]byte("key"), "L3-value")
+
+	// Commit from L3 up to L1
+	batchL3.Commit() // L3 → L2
+	batchL2.Commit() // L2 → L1
+	batchL1.Commit() // L1 → tree
+
+	// Verify final value in tree
+	currentBatch := tree.NewBatch()
+	val := currentBatch.Get([]byte("key"))
+	require.Equal(t, "L3-value", val, "Tree should have value from L3 after cascading commits")
+
+	// Get snapshot at height 100
+	snapshotBatch, found := tree.GetSnapshotBatch(100)
+	require.True(t, found, "Should find snapshot at height 100")
+
+	val = snapshotBatch.Get([]byte("key"))
+	require.Equal(t, "L3-value", val, "Snapshot should have L3 value")
+
+	// Try modifying a snapshot batch (should work, but not affect original)
+	snapshotBatch.Set([]byte("key"), "modified-snapshot")
+	val = snapshotBatch.Get([]byte("key"))
+	require.Equal(t, "modified-snapshot", val, "Can modify snapshot batch locally")
+
+	// But original snapshot should be unchanged
+	newSnapshotBatch, _ := tree.GetSnapshotBatch(100)
+	val = newSnapshotBatch.Get([]byte("key"))
+	require.Equal(t, "L3-value", val, "Original snapshot should be unchanged")
+}
+
 // cpu: Apple M2 Pro
 // BenchmarkTreeBatchSet-12    	  244624	      5341 ns/op	   12467 B/op	      34 allocs/op
 func BenchmarkTreeBatchSet(b *testing.B) {

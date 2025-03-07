@@ -307,10 +307,17 @@ func TestUncommittedL1BatchChanges(t *testing.T) {
 }
 
 // cpu: Apple M2 Pro
-// BenchmarkTreeBatchSet-12    	  290637	      3805 ns/op	   10797 B/op	      30 allocs/op
+// BenchmarkTreeBatchSet-12    	  244624	      5341 ns/op	   12467 B/op	      34 allocs/op
 func BenchmarkTreeBatchSet(b *testing.B) {
 	b.ReportAllocs()
 	tree := NewTree()
+	setter := tree.UnsafeSetter()
+	for i := 0; i < 50_000_000; i++ {
+		setter.Set(
+			[]byte(fmt.Sprintf("key-%d", i)),
+			fmt.Sprintf("value-%d", i),
+		)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

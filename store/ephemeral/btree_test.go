@@ -305,3 +305,20 @@ func TestUncommittedL1BatchChanges(t *testing.T) {
 	val = checkBatch.Get([]byte("to-delete"))
 	require.Equal(t, "temp-value", val, "New batch should still see key that was deleted in uncommitted batch")
 }
+
+// cpu: Apple M2 Pro
+// BenchmarkTreeBatchSet-12    	  290637	      3805 ns/op	   10797 B/op	      30 allocs/op
+func BenchmarkTreeBatchSet(b *testing.B) {
+	b.ReportAllocs()
+	tree := NewTree()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		batch := tree.NewBatch()
+		batch.Set(
+			[]byte(fmt.Sprintf("key-%d", i)),
+			fmt.Sprintf("value-%d", i),
+		)
+		batch.Commit()
+	}
+}

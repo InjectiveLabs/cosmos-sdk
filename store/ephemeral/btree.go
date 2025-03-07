@@ -84,16 +84,12 @@ func (b *IndexedBatch) Get(key []byte) any {
 
 // Set adds or updates a key-value pair in the current batch.
 func (b *IndexedBatch) Set(key []byte, value any) {
-	b.write(func(tree *btree) {
-		tree.Set(key, value)
-	})
+	b.write(func(tree *btree) { tree.Set(key, value) })
 }
 
 // Delete removes a key from the current batch.
 func (b *IndexedBatch) Delete(key []byte) {
-	b.write(func(tree *btree) {
-		tree.Delete(key)
-	})
+	b.write(func(tree *btree) { tree.Delete(key) })
 }
 
 // write executes operations on the current batch's btree.
@@ -106,8 +102,9 @@ func (b *IndexedBatch) Delete(key []byte) {
 //     1. Applying rwlock only at L2 (where actual write operations occur)
 //     2. Storing diffs and performing k-way merges instead of copy-on-write
 //
-// benchmark result:
+// Benchmark result:
 // BenchmarkCopyPerOperation-12    	  470655	      2777 ns/op	    5230 B/op	      21 allocs/op
+//   - performing single Set/Delete operation on a B-tree with 50 million nodes
 func (b *IndexedBatch) write(cb func(tree *btree)) {
 	// Use the current batch's btree to perform operations.
 	// The current.writer is a Copy()'d btree.

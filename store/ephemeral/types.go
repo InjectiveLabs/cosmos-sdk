@@ -5,7 +5,6 @@ import "cosmossdk.io/store/ephemeral/internal"
 type btree = internal.BTree
 
 type (
-
 	// EphemeralStore defines the interface for a tree with batching capabilities.
 	EphemeralStore interface {
 		// NewBatch creates a new batch that can be safely used from multiple goroutines.

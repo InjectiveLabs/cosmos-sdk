@@ -13,7 +13,12 @@ var (
 
 type (
 	Tree struct {
-		root *atomic.Pointer[btree]
+		root      *atomic.Pointer[btree]
+		heightMap HeightMap
+	}
+
+	treeSnapshot struct {
+		tree *btree
 	}
 
 	// IndexedBatch implements a copy-on-write batch operation pattern.
@@ -33,6 +38,8 @@ type (
 			// writer doesn't need atomic.Pointer as it's used with the single writer assumption.
 			writer *btree
 		}
+
+		height int64
 	}
 )
 
@@ -43,7 +50,40 @@ func NewTree() *Tree {
 
 	return &Tree{
 		root: root,
+
+		heightMap: newHeightMap(),
 	}
+}
+
+func (t *Tree) GetSnapshot(height int64) (EphemeralSnapshot, bool) {
+	store, ok := t.heightMap.Get(height)
+	if !ok {
+		return nil, false
+	}
+
+	return store, true
+}
+
+func (t *treeSnapshot) Get(key []byte) any {
+	return t.tree.Get(key)
+}
+
+func (t *treeSnapshot) Iterator(start, end []byte) Iterator {
+	iter, err := t.tree.Iterator(start, end)
+	if err != nil {
+		panic(err)
+	}
+
+	return iter
+}
+
+func (t *treeSnapshot) ReverseIterator(start, end []byte) Iterator {
+	iter, err := t.tree.ReverseIterator(start, end)
+	if err != nil {
+		panic(err)
+	}
+
+	return iter
 }
 
 // NewBatch creates a top-level batch.
@@ -80,6 +120,24 @@ func (t *Tree) UnsafeSetter() interface{ Set(key []byte, value any) } {
 // Get retrieves a value for the given key from the current batch.
 func (b *IndexedBatch) Get(key []byte) any {
 	return b.current.reader.Load().Get(key)
+}
+
+func (b *IndexedBatch) Iterator(start, end []byte) Iterator {
+	iter, err := b.current.reader.Load().Iterator(start, end)
+	if err != nil {
+		panic(err)
+	}
+
+	return iter
+}
+
+func (b *IndexedBatch) ReverseIterator(start, end []byte) Iterator {
+	iter, err := b.current.reader.Load().ReverseIterator(start, end)
+	if err != nil {
+		panic(err)
+	}
+
+	return iter
 }
 
 // Set adds or updates a key-value pair in the current batch.
@@ -168,9 +226,25 @@ func (b *IndexedBatch) Commit() {
 		if !b.tree.root.CompareAndSwap(b.base, b.current.reader.Load()) {
 			panic("commit failed: concurrent modification detected")
 		}
+
+		if b.height != 0 {
+			// Update the height map with the new store
+			copiedStore := b.tree.root.Load().Copy()
+			b.tree.heightMap.Set(b.height, &treeSnapshot{
+				tree: copiedStore,
+			})
+		}
+
 		return
 	}
 
 	// This case should never happen
 	panic("unreachable code, base is nil & parent is nil")
+}
+
+// TODO(ephemeral):
+// 1. call baseapp.setState -> cms.GetEphemeralStore().SetHeight(height)
+// 2. call in rootmulti.Store.CacheMultiStoreWithVersion(ver int64)
+func (b *IndexedBatch) SetHeight(height int64) {
+	b.height = height
 }

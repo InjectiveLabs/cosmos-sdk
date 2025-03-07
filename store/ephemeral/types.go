@@ -15,8 +15,17 @@ type (
 		// When L1 batch's Commit() is called, it replaces tree.root using atomic.CompareAndSwap().
 		NewBatch() EphemeralBatch
 
+		GetSnapshot(height int64) (EphemeralSnapshot, bool)
+
 		// directly returns the value for the given key from the tree's reader btree.
 		UnsafeSetter() interface{ Set(key []byte, value any) }
+	}
+
+	EphemeralSnapshot interface {
+		Get(key []byte) any
+
+		Iterator(start, end []byte) Iterator
+		ReverseIterator(start, end []byte) Iterator
 	}
 
 	// EphemeralBatch defines operations that can be performed on a batch.
@@ -51,5 +60,30 @@ type (
 		//   Failure can occur if another goroutine has modified tree.root.
 		//   We assume this case is handled by higher-level usecases.
 		Commit()
+
+		Iterator(start, end []byte) Iterator
+		ReverseIterator(start, end []byte) Iterator
+
+		SetHeight(height int64)
+	}
+
+	Iterator interface {
+		Key() []byte
+		Value() any
+
+		Valid() bool
+
+		// Next moves the iterator to the next item.
+		Next()
+
+		Close() error
+	}
+
+	HeightMap interface {
+		//
+		Get(height int64) (EphemeralSnapshot, bool)
+
+		//
+		Set(height int64, store EphemeralSnapshot)
 	}
 )

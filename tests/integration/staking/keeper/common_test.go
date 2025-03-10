@@ -127,6 +127,7 @@ func initFixture(t testing.TB) *fixture {
 	bankKeeper := bankkeeper.NewBaseKeeper(
 		cdc,
 		runtime.NewKVStoreService(keys[banktypes.StoreKey]),
+		nil,
 		accountKeeper,
 		blockedAddresses,
 		authority.String(),

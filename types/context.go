@@ -67,8 +67,8 @@ type Context struct {
 	cometInfo            comet.BlockInfo
 	headerInfo           header.Info
 
-	// extend Context with ephemeral store
-	ephemeralStore ephemeral.EphemeralKVStore
+	// extend Context with ephemeral batch
+	ephemeralBatch ephemeral.EphemeralBatch
 }
 
 // Proposed rename, not done to avoid API breakage
@@ -350,8 +350,8 @@ func (c Context) KVStore(key storetypes.StoreKey) storetypes.KVStore {
 	return gaskv.NewStore(c.ms.GetKVStore(key), c.gasMeter, c.kvGasConfig)
 }
 
-func (c Context) EphemeralKVStore() ephemeral.EphemeralKVStore {
-	return c.ms.GetEphemeralKVStore()
+func (c Context) EphemeralBatch() ephemeral.EphemeralBatch {
+	return c.ms.GetEphemeralBatch()
 }
 
 // TransientStore fetches a TransientStore from the MultiStore.

@@ -230,9 +230,9 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 	require.NoError(t, err)
 
 	app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
-		ekv := ctx.EphemeralKVStore()
+		ekv := ctx.EphemeralBatch()
 		typedKV := ephemeral.
-			NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+			NewTypedBatch[*cmtproto.Block](ekv)
 
 		typedKV.Set([]byte("block-1"), &cmtproto.Block{
 			Header: cmtproto.Header{Height: 1},
@@ -240,9 +240,9 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 
 		cacheCtx, writeCache := ctx.CacheContext()
 		{
-			ekv := cacheCtx.EphemeralKVStore()
+			ekv := cacheCtx.EphemeralBatch()
 			typedKV := ephemeral.
-				NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+				NewTypedBatch[*cmtproto.Block](ekv)
 
 			typedKV.Set([]byte("block-2"), &cmtproto.Block{
 				Header: cmtproto.Header{Height: 2},
@@ -256,9 +256,9 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 
 		cacheCtx2, writeCache2 := ctx.CacheContext()
 		{
-			ekv := cacheCtx2.EphemeralKVStore()
+			ekv := cacheCtx2.EphemeralBatch()
 			typedKV := ephemeral.
-				NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+				NewTypedBatch[*cmtproto.Block](ekv)
 
 			typedKV.Set([]byte("block-3"), &cmtproto.Block{
 				Header: cmtproto.Header{Height: 3},
@@ -281,7 +281,7 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 	require.NoError(t, err)
 
 	cms := app.CommitMultiStore()
-	ephemeral := cms.GetEphemeralKVStore()
+	ephemeral := cms.GetEphemeralBatch()
 	val := ephemeral.Get([]byte("block-1"))
 	require.Nil(t, val)
 
@@ -306,11 +306,11 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 	db := dbm.NewMemDB()
 
 	warmupCallback := func(
-		ek ephemeral.EphemeralKVStore,
+		batch ephemeral.EphemeralBatch,
 		db dbm.DB,
 	) error {
 		typedKV := ephemeral.
-			NewTypedEpeheralKVStore[*cmtproto.Block](ek)
+			NewTypedBatch[*cmtproto.Block](batch)
 
 		val, err := db.Get([]byte("s/latest"))
 		if err != nil || val == nil {
@@ -339,9 +339,9 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 		)
 		app.SetWarmupEphemeralStore(warmupCallback)
 		app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
-			ekv := ctx.EphemeralKVStore()
+			ekv := ctx.EphemeralBatch()
 			typedKV := ephemeral.
-				NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+				NewTypedBatch[*cmtproto.Block](ekv)
 
 			header := ctx.BlockHeader()
 			typedKV.Set(
@@ -387,8 +387,8 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 	}{}
 	{
 		cms := app.CommitMultiStore()
-		ekv := cms.GetEphemeralKVStore()
-		typedEkv := ephemeral.NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+		ekv := cms.GetEphemeralBatch()
+		typedEkv := ephemeral.NewTypedBatch[*cmtproto.Block](ekv)
 		iter := typedEkv.Iterator(nil, nil)
 		for ; iter.Valid(); iter.Next() {
 			ephemeralSnapshot = append(ephemeralSnapshot, struct {
@@ -406,8 +406,8 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 	app2 := newApp(db)
 	{ // check ephemeral snapshot
 		cms := app2.CommitMultiStore()
-		ekv := cms.GetEphemeralKVStore()
-		typedEkv := ephemeral.NewTypedEpeheralKVStore[*cmtproto.Block](ekv)
+		ekv := cms.GetEphemeralBatch()
+		typedEkv := ephemeral.NewTypedBatch[*cmtproto.Block](ekv)
 		for _, kv := range ephemeralSnapshot {
 			val := typedEkv.Get(kv.key)
 			require.Equal(t, kv.value, val)

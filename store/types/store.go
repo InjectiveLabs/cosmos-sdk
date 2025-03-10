@@ -137,7 +137,7 @@ type MultiStore interface {
 	// If the store does not exist, panics.
 	GetStore(StoreKey) Store
 	GetKVStore(StoreKey) KVStore
-	GetEphemeralKVStore() ephemeral.EphemeralBatch
+	GetEphemeralBatch() ephemeral.EphemeralBatch
 
 	// TracingEnabled returns if tracing is enabled for the MultiStore.
 	TracingEnabled() bool
@@ -161,7 +161,7 @@ type CacheMultiStore interface {
 	MultiStore
 	Write() // Writes operations to underlying KVStore
 
-	SetHeight(int64) // Set the height of the CacheMultiStore
+	SetHeight(int64) // Set the height of the CacheMultiStore(for ephemeral store)
 }
 
 // CommitMultiStore is an interface for a MultiStore without cache capabilities.
@@ -215,7 +215,7 @@ type CommitMultiStore interface {
 	SetIAVLDisableFastNode(disable bool)
 
 	// TODO: Later, we should create a stage similar to CacheWarmup in BaseApp so that access is limited to what the Keeper can use, rather than granting permissions to the entire database
-	SetWarmupEphemeral(func(ephemeral.EphemeralStore, dbm.DB) error)
+	SetWarmupEphemeral(func(ephemeral.EphemeralBatch, dbm.DB) error)
 
 	// RollbackToVersion rollback the db to specific version(height).
 	RollbackToVersion(version int64) error

@@ -28,7 +28,7 @@ type Store struct {
 	db             types.CacheKVStore
 	stores         map[types.StoreKey]types.CacheWrap
 	keys           map[string]types.StoreKey
-	ephemeralStore ephemeral.EphemeralBatch
+	ephemeralBatch ephemeral.EphemeralBatch
 
 	traceWriter  io.Writer
 	traceContext types.TraceContext
@@ -48,7 +48,7 @@ func NewFromKVStore(
 		db:             cachekv.NewStore(store),
 		stores:         make(map[types.StoreKey]types.CacheWrap, len(stores)),
 		keys:           keys,
-		ephemeralStore: ephermalStore.NewNestedBatch(),
+		ephemeralBatch: ephermalStore.NewNestedBatch(),
 
 		traceWriter:  traceWriter,
 		traceContext: traceContext,
@@ -83,7 +83,14 @@ func newCacheMultiStoreFromCMS(cms Store, ecs ephemeral.EphemeralBatch) Store {
 		stores[k] = v
 	}
 
-	return NewFromKVStore(cms.db, stores, nil, cms.traceWriter, cms.traceContext, ecs)
+	return NewFromKVStore(
+		cms.db,
+		stores,
+		nil,
+		cms.traceWriter,
+		cms.traceContext,
+		ecs.NewNestedBatch(),
+	)
 }
 
 // SetTracer sets the tracer for the MultiStore that the underlying
@@ -131,11 +138,11 @@ func (cms Store) Write() {
 		store.Write()
 	}
 
-	cms.ephemeralStore.Commit()
+	cms.ephemeralBatch.Commit()
 }
 
 func (cms Store) SetHeight(version int64) {
-	cms.ephemeralStore.SetHeight(version)
+	cms.ephemeralBatch.SetHeight(version)
 }
 
 // Implements CacheWrapper.
@@ -150,7 +157,7 @@ func (cms Store) CacheWrapWithTrace(_ io.Writer, _ types.TraceContext) types.Cac
 
 // Implements MultiStore.
 func (cms Store) CacheMultiStore() types.CacheMultiStore {
-	return newCacheMultiStoreFromCMS(cms, cms.ephemeralStore)
+	return newCacheMultiStoreFromCMS(cms, cms.ephemeralBatch)
 }
 
 // CacheMultiStoreWithVersion implements the MultiStore interface. It will panic
@@ -180,6 +187,6 @@ func (cms Store) GetKVStore(key types.StoreKey) types.KVStore {
 	return store.(types.KVStore)
 }
 
-func (cms Store) GetEphemeralKVStore() ephemeral.EphemeralBatch {
-	return cms.ephemeralStore
+func (cms Store) GetEphemeralBatch() ephemeral.EphemeralBatch {
+	return cms.ephemeralBatch
 }

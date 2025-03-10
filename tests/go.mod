@@ -31,7 +31,10 @@ require (
 	pgregory.net/rapid v1.1.0
 )
 
-require github.com/cometbft/cometbft/api v1.0.0
+require (
+	github.com/cometbft/cometbft/api v1.0.0
+	gotest.tools v2.2.0+incompatible
+)
 
 require (
 	buf.build/gen/go/cometbft/cometbft/protocolbuffers/go v1.36.5-20241120201313-68e42a58b301.1 // indirect

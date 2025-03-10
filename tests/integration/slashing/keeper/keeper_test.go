@@ -82,9 +82,11 @@ func initFixture(t testing.TB) *fixture {
 	blockedAddresses := map[string]bool{
 		accountKeeper.GetAuthority(): false,
 	}
+
 	bankKeeper := bankkeeper.NewBaseKeeper(
 		cdc,
 		runtime.NewKVStoreService(keys[banktypes.StoreKey]),
+		nil,
 		accountKeeper,
 		blockedAddresses,
 		authority.String(),

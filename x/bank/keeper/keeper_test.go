@@ -258,7 +258,7 @@ func (suite *KeeperTestSuite) mockUnDelegateCoins(ctx context.Context, acc, mAcc
 func (suite *KeeperTestSuite) TestAppendSendRestriction() {
 	var calls []int
 	testRestriction := func(index int) banktypes.SendRestrictionFn {
-		return func(_ context.Context, _, _ sdk.AccAddress, _ sdk.Coins) (sdk.AccAddress, error) {
+		return func(_ context.Context, _, _ sdk.AccAddress, _ sdk.Coin) (sdk.AccAddress, error) {
 			calls = append(calls, index)
 			return nil, nil
 		}
@@ -269,25 +269,25 @@ func (suite *KeeperTestSuite) TestAppendSendRestriction() {
 	// Initial append of the test restriction.
 	bk.SetSendRestriction(nil)
 	bk.AppendSendRestriction(testRestriction(1))
-	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{1}, calls, "restriction calls after first append")
 
 	// Append the test restriction again.
 	calls = nil
 	bk.AppendSendRestriction(testRestriction(2))
-	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{1, 2}, calls, "restriction calls after second append")
 
 	// make sure the original bank keeper has the restrictions too.
 	calls = nil
-	_, _ = suite.bankKeeper.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = suite.bankKeeper.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{1, 2}, calls, "restriction calls from original bank keeper")
 }
 
 func (suite *KeeperTestSuite) TestPrependSendRestriction() {
 	var calls []int
 	testRestriction := func(index int) banktypes.SendRestrictionFn {
-		return func(_ context.Context, _, _ sdk.AccAddress, _ sdk.Coins) (sdk.AccAddress, error) {
+		return func(_ context.Context, _, _ sdk.AccAddress, _ sdk.Coin) (sdk.AccAddress, error) {
 			calls = append(calls, index)
 			return nil, nil
 		}
@@ -298,18 +298,18 @@ func (suite *KeeperTestSuite) TestPrependSendRestriction() {
 	// Initial append of the test restriction.
 	bk.SetSendRestriction(nil)
 	bk.PrependSendRestriction(testRestriction(1))
-	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{1}, calls, "restriction calls after first append")
 
 	// Append the test restriction again.
 	calls = nil
 	bk.PrependSendRestriction(testRestriction(2))
-	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = bk.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{2, 1}, calls, "restriction calls after second append")
 
 	// make sure the original bank keeper has the restrictions too.
 	calls = nil
-	_, _ = suite.bankKeeper.GetSendRestrictionFn()(suite.ctx, nil, nil, nil)
+	_, _ = suite.bankKeeper.GetSendRestrictionFn()(suite.ctx, nil, nil, sdk.Coin{})
 	suite.Require().Equal([]int{2, 1}, calls, "restriction calls from original bank keeper")
 }
 
@@ -617,6 +617,8 @@ func (suite *KeeperTestSuite) TestSendCoinsNewAccount() {
 	balances := sdk.NewCoins(newFooCoin(100), newBarCoin(50))
 
 	suite.mockFundAccount(accAddrs[0])
+	// required since multiple coins are sent to funded account
+	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[0]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[0], balances))
 
 	acc0 := authtypes.NewBaseAccountWithAddress(accAddrs[0])
@@ -628,6 +630,8 @@ func (suite *KeeperTestSuite) TestSendCoinsNewAccount() {
 
 	sendAmt := sdk.NewCoins(newFooCoin(50), newBarCoin(50))
 	suite.mockSendCoins(ctx, acc0, accAddrs[1])
+	// required since multiple coins are sent to receiver account
+	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[1]).Return(true)
 	require.NoError(suite.bankKeeper.SendCoins(ctx, accAddrs[0], accAddrs[1], sendAmt))
 
 	acc2Balances := suite.bankKeeper.GetAllBalances(ctx, accAddrs[1])
@@ -645,6 +649,8 @@ func (suite *KeeperTestSuite) TestInputOutputNewAccount() {
 	balances := sdk.NewCoins(newFooCoin(100), newBarCoin(50))
 
 	suite.mockFundAccount(accAddrs[0])
+	// required since multiple coins are sent to funded account
+	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[0]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[0], balances))
 
 	acc1Balances := suite.bankKeeper.GetAllBalances(ctx, accAddrs[0])
@@ -660,7 +666,8 @@ func (suite *KeeperTestSuite) TestInputOutputNewAccount() {
 	outputs := []banktypes.Output{
 		{Address: accAddrs[1].String(), Coins: sdk.NewCoins(newFooCoin(30), newBarCoin(10))},
 	}
-
+	// required since multiple coins are sent output accounts
+	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[1]).Return(true)
 	require.NoError(suite.bankKeeper.InputOutputCoins(ctx, input, outputs))
 
 	expected := sdk.NewCoins(newFooCoin(30), newBarCoin(10))
@@ -688,6 +695,8 @@ func (suite *KeeperTestSuite) TestInputOutputCoins() {
 	require.Error(suite.bankKeeper.InputOutputCoins(ctx, input, outputs))
 
 	suite.mockFundAccount(accAddrs[0])
+	// required since multiple coins are sent to funded account
+	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[0]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[0], balances))
 
 	insufficientInput := banktypes.Input{
@@ -700,8 +709,12 @@ func (suite *KeeperTestSuite) TestInputOutputCoins() {
 	}
 
 	require.Error(suite.bankKeeper.InputOutputCoins(ctx, insufficientInput, insufficientOutputs))
-
 	suite.mockInputOutputCoins([]sdk.AccountI{acc0}, accAddrs[1:3])
+
+	// required since multiple coins are sent to each output account
+	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[1]).Return(true)
+	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[2]).Return(true)
+
 	require.NoError(suite.bankKeeper.InputOutputCoins(ctx, input, outputs))
 
 	acc1Balances := suite.bankKeeper.GetAllBalances(ctx, accAddrs[0])
@@ -725,12 +738,12 @@ func (suite *KeeperTestSuite) TestInputOutputCoinsWithRestrictions() {
 	var actualRestrictionArgs []*restrictionArgs
 	restrictionError := func(messages ...string) banktypes.SendRestrictionFn {
 		i := -1
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = append(actualRestrictionArgs, &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.Coins{amt},
 			})
 			i++
 			if i < len(messages) {
@@ -742,24 +755,24 @@ func (suite *KeeperTestSuite) TestInputOutputCoinsWithRestrictions() {
 		}
 	}
 	restrictionPassthrough := func() banktypes.SendRestrictionFn {
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = append(actualRestrictionArgs, &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.Coins{amt},
 			})
 			return toAddr, nil
 		}
 	}
 	restrictionNewTo := func(newToAddrs ...sdk.AccAddress) banktypes.SendRestrictionFn {
 		i := -1
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = append(actualRestrictionArgs, &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.Coins{amt},
 			})
 			i++
 			if i < len(newToAddrs) {
@@ -785,6 +798,8 @@ func (suite *KeeperTestSuite) TestInputOutputCoinsWithRestrictions() {
 	toAddr2 := accAddrs[2]
 
 	suite.mockFundAccount(accAddrs[0])
+	// required since multiple coins are sent to funded account
+	suite.authKeeper.EXPECT().HasAccount(setupCtx, accAddrs[0]).Return(true)
 	suite.Require().NoError(banktestutil.FundAccount(setupCtx, suite.bankKeeper, accAddrs[0], balances))
 
 	tests := []struct {
@@ -865,7 +880,7 @@ func (suite *KeeperTestSuite) TestInputOutputCoinsWithRestrictions() {
 			},
 			expErr: "restriction test error",
 			expBals: expBals{
-				from: sdk.NewCoins(newFooCoin(959), newBarCoin(412)),
+				from: sdk.NewCoins(newFooCoin(959), newBarCoin(500)),
 				to1:  sdk.NewCoins(newFooCoin(15)),
 				to2:  sdk.NewCoins(newFooCoin(26)),
 			},
@@ -894,7 +909,7 @@ func (suite *KeeperTestSuite) TestInputOutputCoinsWithRestrictions() {
 				},
 			},
 			expBals: expBals{
-				from: sdk.NewCoins(newFooCoin(948), newBarCoin(400)),
+				from: sdk.NewCoins(newFooCoin(948), newBarCoin(488)),
 				to1:  sdk.NewCoins(newFooCoin(26)),
 				to2:  sdk.NewCoins(newFooCoin(26), newBarCoin(12)),
 			},
@@ -924,7 +939,7 @@ func (suite *KeeperTestSuite) TestInputOutputCoinsWithRestrictions() {
 			},
 			expErr: "second restriction error",
 			expBals: expBals{
-				from: sdk.NewCoins(newFooCoin(904), newBarCoin(400)),
+				from: sdk.NewCoins(newFooCoin(936), newBarCoin(488)),
 				to1:  sdk.NewCoins(newFooCoin(38)),
 				to2:  sdk.NewCoins(newFooCoin(26), newBarCoin(12)),
 			},
@@ -953,7 +968,7 @@ func (suite *KeeperTestSuite) TestInputOutputCoinsWithRestrictions() {
 				},
 			},
 			expBals: expBals{
-				from: sdk.NewCoins(newFooCoin(904), newBarCoin(365)),
+				from: sdk.NewCoins(newFooCoin(936), newBarCoin(453)),
 				to1:  sdk.NewCoins(newFooCoin(38), newBarCoin(25)),
 				to2:  sdk.NewCoins(newFooCoin(26), newBarCoin(22)),
 			},
@@ -1011,13 +1026,19 @@ func (suite *KeeperTestSuite) TestSendCoins() {
 	acc0 := authtypes.NewBaseAccountWithAddress(accAddrs[0])
 
 	suite.mockFundAccount(accAddrs[1])
+	// required since multiple coins are sent to funded account
+	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[1]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[1], balances))
 
 	sendAmt := sdk.NewCoins(newFooCoin(50), newBarCoin(25))
 	suite.authKeeper.EXPECT().GetAccount(suite.ctx, accAddrs[0]).Return(acc0)
+	// required since multiple coins are sent to account
+	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[1]).Return(true)
 	require.Error(suite.bankKeeper.SendCoins(ctx, accAddrs[0], accAddrs[1], sendAmt))
 
 	suite.mockFundAccount(accAddrs[0])
+	// required since multiple coins are sent to funded account
+	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[0]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[0], balances))
 	suite.mockSendCoins(ctx, acc0, accAddrs[1])
 	require.NoError(suite.bankKeeper.SendCoins(ctx, accAddrs[0], accAddrs[1], sendAmt))
@@ -1049,34 +1070,34 @@ func (suite *KeeperTestSuite) TestSendCoinsWithRestrictions() {
 	}
 	var actualRestrictionArgs *restrictionArgs
 	restrictionError := func(message string) banktypes.SendRestrictionFn {
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.Coins{amt},
 			}
 			return nil, errors.New(message)
 		}
 	}
 	restrictionPassthrough := func() banktypes.SendRestrictionFn {
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.Coins{amt},
 			}
 			return toAddr, nil
 		}
 	}
 	restrictionNewTo := func(newToAddr sdk.AccAddress) banktypes.SendRestrictionFn {
-		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coins) (sdk.AccAddress, error) {
+		return func(ctx context.Context, fromAddr, toAddr sdk.AccAddress, amt sdk.Coin) (sdk.AccAddress, error) {
 			actualRestrictionArgs = &restrictionArgs{
 				ctx:      ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr,
-				amt:      amt,
+				amt:      sdk.Coins{amt},
 			}
 			return newToAddr, nil
 		}
@@ -1095,6 +1116,9 @@ func (suite *KeeperTestSuite) TestSendCoinsWithRestrictions() {
 	toAddr2 := accAddrs[2]
 
 	suite.mockFundAccount(accAddrs[0])
+	// required since multiple coins are sent to funded account
+
+	suite.authKeeper.EXPECT().HasAccount(setupCtx, accAddrs[0]).Return(true)
 	suite.Require().NoError(banktestutil.FundAccount(setupCtx, suite.bankKeeper, accAddrs[0], balances))
 
 	tests := []struct {
@@ -1161,16 +1185,16 @@ func (suite *KeeperTestSuite) TestSendCoinsWithRestrictions() {
 			fn:        restrictionError("test restriction error"),
 			toAddr:    toAddr1,
 			finalAddr: toAddr1,
-			amt:       sdk.NewCoins(newFooCoin(100), newBarCoin(200)),
+			amt:       sdk.NewCoins(newBarCoin(200)),
 			expArgs: &restrictionArgs{
 				ctx:      suite.ctx,
 				fromAddr: fromAddr,
 				toAddr:   toAddr1,
-				amt:      sdk.NewCoins(newFooCoin(100), newBarCoin(200)),
+				amt:      sdk.NewCoins(newBarCoin(200)),
 			},
 			expErr: "test restriction error",
 			expBals: expBals{
-				from: sdk.NewCoins(newFooCoin(885), newBarCoin(273)),
+				from: sdk.NewCoins(newFooCoin(985), newBarCoin(473)),
 				to1:  sdk.NewCoins(newFooCoin(15)),
 				to2:  sdk.NewCoins(newBarCoin(27)),
 			},
@@ -1421,14 +1445,22 @@ func (suite *KeeperTestSuite) TestMsgMultiSendEvents() {
 
 	// Set addr's coins but not accAddrs[1]'s coins
 	suite.mockFundAccount(accAddrs[0])
+	// required since multiple coins are sent to funded account
+	suite.authKeeper.EXPECT().HasAccount(ctx, accAddrs[0]).Return(true)
 	require.NoError(banktestutil.FundAccount(ctx, suite.bankKeeper, accAddrs[0], sdk.NewCoins(sdk.NewInt64Coin(fooDenom, 50), sdk.NewInt64Coin(barDenom, 100))))
-
 	suite.mockInputOutputCoins([]sdk.AccountI{acc0}, accAddrs[2:4])
+	// required since multiple coins are sent to output accounts
+	for _, out := range outputs {
+		if len(out.Coins) > 1 {
+			suite.authKeeper.EXPECT().HasAccount(ctx, out.Address).Return(true)
+		}
+	}
 	require.NoError(suite.bankKeeper.InputOutputCoins(ctx, input, outputs))
 
 	events = ctx.EventManager().ABCIEvents()
-	require.Equal(12, len(events)) // 12 events because account funding causes extra minting + coin_spent + coin_recv events
-
+	require.Equal(16, len(events)) // 12 events because account funding causes extra minting + coin_spent + coin_recv events
+	// + plus 4 transfer events as SendCoin is called for each coin sent since
+	// https://github.com/InjectiveLabs/cosmos-sdk/commit/59f4bfe90556ee3b13f6a99fb27759d1ceedfa49
 	event1 := sdk.Event{
 		Type:       sdk.EventTypeMessage,
 		Attributes: []abci.EventAttribute{},
@@ -1437,7 +1469,7 @@ func (suite *KeeperTestSuite) TestMsgMultiSendEvents() {
 		event1.Attributes,
 		abci.EventAttribute{Key: banktypes.AttributeKeySender, Value: accAddrs[0].String()},
 	)
-	require.Equal(abci.Event(event1), events[7])
+	require.Equal(abci.Event(event1), events[15])
 
 	// Set addr's coins and accAddrs[1]'s coins
 	suite.mockFundAccount(accAddrs[0])
@@ -1449,10 +1481,16 @@ func (suite *KeeperTestSuite) TestMsgMultiSendEvents() {
 	newCoins2 = sdk.NewCoins(sdk.NewInt64Coin(barDenom, 100))
 
 	suite.mockInputOutputCoins([]sdk.AccountI{acc0}, accAddrs[2:4])
+	// required since multiple coins are sent to output accounts
+	for _, out := range outputs {
+		if len(out.Coins) > 1 {
+			suite.authKeeper.EXPECT().HasAccount(ctx, out.Address).Return(true)
+		}
+	}
 	require.NoError(suite.bankKeeper.InputOutputCoins(ctx, input, outputs))
 
 	events = ctx.EventManager().ABCIEvents()
-	require.Equal(30, len(events)) // 27 due to account funding + coin_spent + coin_recv events
+	require.Equal(35, len(events)) // 27 due to account funding + coin_spent + coin_recv events
 
 	event2 := sdk.Event{
 		Type:       banktypes.EventTypeTransfer,
@@ -1461,6 +1499,10 @@ func (suite *KeeperTestSuite) TestMsgMultiSendEvents() {
 	event2.Attributes = append(
 		event2.Attributes,
 		abci.EventAttribute{Key: banktypes.AttributeKeyRecipient, Value: accAddrs[2].String()},
+	)
+	event2.Attributes = append(
+		event2.Attributes,
+		abci.EventAttribute{Key: banktypes.AttributeKeySender, Value: accAddrs[0].String()},
 	)
 	event2.Attributes = append(
 		event2.Attributes,
@@ -1475,12 +1517,16 @@ func (suite *KeeperTestSuite) TestMsgMultiSendEvents() {
 	)
 	event3.Attributes = append(
 		event3.Attributes,
+		abci.EventAttribute{Key: banktypes.AttributeKeySender, Value: accAddrs[0].String()},
+	)
+	event3.Attributes = append(
+		event3.Attributes,
 		abci.EventAttribute{Key: sdk.AttributeKeyAmount, Value: newCoins2.String()},
 	)
 	// events are shifted due to the funding account events
-	require.Equal(abci.Event(event1), events[25])
-	require.Equal(abci.Event(event2), events[27])
-	require.Equal(abci.Event(event3), events[29])
+	require.Equal(abci.Event(event1), events[34])
+	require.Equal(abci.Event(event2), events[30])
+	require.Equal(abci.Event(event3), events[33])
 }
 
 func (suite *KeeperTestSuite) TestSpendableCoins() {

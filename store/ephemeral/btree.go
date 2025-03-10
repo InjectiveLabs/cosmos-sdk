@@ -71,6 +71,9 @@ func (t *Tree) GetSnapshotBatch(height int64) (EphemeralBatch, bool) {
 	}
 
 	batch := reader.NewBatch()
+	// The snapshot batch is a Batch type used in CacheMultiStoreWithVersion(..).
+	// Since it handles data for queries at past heights, it is immutable.
+	// Therefore, Commit() cannot be performed.
 	return &UncommittableBatch{batch}, true
 }
 
@@ -110,6 +113,14 @@ func (b *IndexedBatch) Get(key []byte) any {
 	return b.current.reader.Load().Get(key)
 }
 
+// Iterator returns an iterator over the key-value pairs in the batch
+// within the specified range.
+//
+// The iterator will include items with key >= start and key < end.
+// If start is nil, it returns all items from the beginning.
+// If end is nil, it returns all items until the end.
+//
+// If an error occurs during initialization, this method panics.
 func (b *IndexedBatch) Iterator(start, end []byte) Iterator {
 	iter, err := b.current.reader.Load().Iterator(start, end)
 	if err != nil {
@@ -119,6 +130,14 @@ func (b *IndexedBatch) Iterator(start, end []byte) Iterator {
 	return iter
 }
 
+// ReverseIterator returns an iterator over the key-value pairs in the batch
+// within the specified range, in reverse order (from end to start).
+//
+// The iterator will include items with key >= start and key < end.
+// If start is nil, it returns all items from the beginning.
+// If end is nil, it returns all items until the end.
+//
+// If an error occurs during initialization, this method panics.
 func (b *IndexedBatch) ReverseIterator(start, end []byte) Iterator {
 	iter, err := b.current.reader.Load().ReverseIterator(start, end)
 	if err != nil {
@@ -206,6 +225,12 @@ func (b *IndexedBatch) Commit() {
 	if b.parent != nil {
 		// Nested batch: update parent's current pointer
 		b.parent.current.reader.Store(b.current.reader.Load())
+
+		// TODO(ephemeral): Should we panic if the L1 Batch is already committed?
+		// If we should, consider the following options:
+		//  1. Prevent committing if there are remaining references to L2 from the parent (L1) using reference counting.
+		//  2. Check the base pointer when committing from a child (L2 ~ ..).
+		//  3. Maintain the current behavior.
 		return
 	}
 
@@ -221,8 +246,9 @@ func (b *IndexedBatch) Commit() {
 			ptr := &atomic.Pointer[btree]{}
 			ptr.Store(copiedStore)
 			b.tree.heightMap.Set(b.height, &Tree{
-				root:      ptr,
-				heightMap: newHeightMap(),
+				root: ptr,
+				// heightMap is not used for snapshot batches
+				heightMap: nil,
 			})
 		}
 

@@ -80,7 +80,7 @@ type (
 		EphemeralReader
 		EphemeralWriter
 
-		// Top-level batch에서만 사용되며, (EphemeralWriter).Commit에서 HeightMap.Set을 호출합니다.
+		// Used only in the top-level batch, it calls HeightMap.Set in (EphemeralWriter).Commit.
 		SetHeight(height int64)
 	}
 

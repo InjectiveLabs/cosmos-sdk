@@ -2,9 +2,14 @@ package ephemeral
 
 import (
 	"fmt"
+	"math/rand"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -130,6 +135,160 @@ func TestConcurrencyL1Batch(t *testing.T) {
 	finalValue := tree.get("key")
 	require.Equal(t, fmt.Sprintf("value-%d", selectedIndex), finalValue,
 		"Only the value from committed batch should be reflected in the tree")
+}
+
+// TestConcurrentBatchCreationWithCommits tests the safety of creating L1 batches
+// during continuous commits from another goroutine.
+// This simulates heavy concurrency with one thread committing and many creating batches.
+func TestConcurrentBatchCreationWithCommits(t *testing.T) {
+	tree := NewTree()
+
+	// Initialize tree with some data
+	initialBatch := tree.NewBatch()
+	for i := 0; i < 10; i++ {
+		key := fmt.Sprintf("init-key-%d", i)
+		initialBatch.Set([]byte(key), fmt.Sprintf("init-value-%d", i))
+	}
+	initialBatch.Commit()
+
+	// Number of worker goroutines creating batches
+	const numWorkers = 50
+	// Number of batches each worker will create
+	const batchesPerWorker = 20
+	// Number of commit operations the committer will perform
+	const numCommits = 100
+
+	// Channels for coordination
+	startWorkers := make(chan struct{})
+	stopCommitter := make(chan struct{})
+
+	// Track successful batch creations
+	var createdBatches sync.WaitGroup
+	createdBatches.Add(numWorkers * batchesPerWorker)
+
+	// Track batches created
+	var batchCounter atomic.Uint64
+	batchCreated := func() {
+		batchCounter.Add(1)
+		createdBatches.Done()
+	}
+
+	// Committer goroutine that continuously commits batches
+	go func() {
+		<-startWorkers // Wait for workers to start
+
+		commitCount := 0
+		for {
+			select {
+			case <-stopCommitter:
+				return
+			default:
+				// Create and commit a batch
+				batch := tree.NewBatch()
+				key := fmt.Sprintf("commit-%d", commitCount)
+				batch.Set([]byte(key), fmt.Sprintf("committed-value-%d", commitCount))
+
+				// Small random delay to increase chance of race conditions
+				time.Sleep(time.Millisecond * time.Duration(rand.Intn(5)))
+
+				// Commit the batch
+				batch.Commit()
+				commitCount++
+
+				if commitCount >= numCommits {
+					// We've done enough commits
+					return
+				}
+			}
+		}
+	}()
+
+	// Worker goroutines that create batches
+	for worker := 0; worker < numWorkers; worker++ {
+		go func(workerID int) {
+			// Each worker creates multiple batches
+			for i := 0; i < batchesPerWorker; i++ {
+				// Small random delay to increase concurrency variations
+				time.Sleep(time.Millisecond * time.Duration(rand.Intn(3)))
+
+				// Create a batch
+				batch := tree.NewBatch()
+
+				// Ensure the batch is valid
+				assert.NotNil(t, batch, fmt.Errorf("worker %d: nil batch created", workerID))
+				if batch == nil {
+					batchCreated()
+					continue
+				}
+
+				// Test basic operations
+				key := fmt.Sprintf("worker-%d-batch-%d", workerID, i)
+				value := fmt.Sprintf("value-%d-%d", workerID, i)
+
+				// Try setting a value
+				batch.Set([]byte(key), value)
+
+				// Attempt to read it back
+				readValue := batch.Get([]byte(key))
+				assert.Equal(t, readValue, value, fmt.Errorf("worker %d: batch %d failed to read written value", workerID, i))
+
+				// Try reading an init key that should be present in all batches
+				initKey := "init-key-0"
+				assert.Equal(t, batch.Get([]byte(initKey)), "init-value-0", fmt.Errorf("worker %d: batch %d failed to read initial value", workerID, i))
+
+				// Mark this batch as created and tested
+				batchCreated()
+			}
+		}(worker)
+	}
+
+	// Start all workers
+	close(startWorkers)
+
+	// Wait for all batches to be created
+	done := make(chan struct{})
+	go func() {
+		createdBatches.Wait()
+		close(done)
+	}()
+
+	// Wait with timeout
+	select {
+	case <-done:
+		// All batches created successfully
+	case <-time.After(30 * time.Second):
+		t.Fatalf("Test timed out waiting for batch creations. Created %d/%d batches",
+			batchCounter.Load(), numWorkers*batchesPerWorker)
+	}
+
+	// Stop the committer
+	close(stopCommitter)
+
+	// Verify final tree state contains some committed values
+	lastBatch := tree.NewBatch()
+
+	// Initial values should still be present
+	for i := 0; i < 10; i++ {
+		key := fmt.Sprintf("init-key-%d", i)
+		value := lastBatch.Get([]byte(key))
+		require.Equal(t, value, fmt.Sprintf("init-value-%d", i), fmt.Errorf("Initial value missing or incorrect for key %s: got %v", key, value))
+	}
+
+	// At least some committed values should be present
+	start := []byte("commit-")
+	end := []byte("commit-" + fmt.Sprintf("%d", numCommits))
+	iter := lastBatch.Iterator(start, end)
+	defer iter.Close()
+
+	commitValuesFound := 0
+	for ; iter.Valid(); iter.Next() {
+		commitValuesFound++
+
+		require.True(t, strings.HasPrefix(string(iter.Key()), "commit-"))
+	}
+
+	t.Logf("Found %d/%d committed values in final tree state", commitValuesFound, numCommits)
+	require.True(t, commitValuesFound > 0, "Should find at least some committed values")
 }
 
 // TestUncommittedL2BatchChanges verifies that changes in an uncommitted L2 batch

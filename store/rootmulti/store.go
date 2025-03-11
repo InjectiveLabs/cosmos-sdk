@@ -156,6 +156,10 @@ func (rs *Store) SetWarmupEphemeral(f func(ephemeral.EphemeralBatch, dbm.DB) err
 	rs.warmupEphemeral = f
 }
 
+func (rs *Store) SetSnapshotPoolLimit(limit int64) {
+	rs.ephemeralStore.SetSnapshotPoolLimit(limit)
+}
+
 // GetStoreType implements Store.
 func (rs *Store) GetStoreType() types.StoreType {
 	return types.StoreTypeMulti

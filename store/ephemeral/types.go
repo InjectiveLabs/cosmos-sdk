@@ -16,9 +16,6 @@ type (
 		NewBatch() EphemeralBatch
 
 		GetSnapshotBatch(height int64) (EphemeralBatch, bool)
-
-		// directly returns the value for the given key from the tree's reader btree.
-		UnsafeSetter() interface{ Set(key []byte, value any) }
 	}
 
 	EphemeralReader interface {

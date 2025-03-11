@@ -1,8 +1,6 @@
 package ephemeral
 
 import (
-	"sync/atomic"
-
 	"cosmossdk.io/store/ephemeral/internal"
 )
 
@@ -13,7 +11,7 @@ var (
 
 type (
 	Tree struct {
-		root      *atomic.Pointer[btree]
+		root      *btree
 		heightMap HeightMap
 	}
 
@@ -27,16 +25,7 @@ type (
 		// base is a snapshot of the btree at the time the batch was created
 		base *btree
 		// current reflects changes made during batch operations
-		current *struct {
-			// reader uses copy-on-write snapshot pattern.
-			// It's wrapped in `atomic.Pointer` for safe concurrent access from other goroutines.
-			//
-			// Since the reader is an immutable object already created as a snapshot,
-			// it should be safe for "read operations" after `Load()`.
-			reader *atomic.Pointer[btree]
-			// writer doesn't need atomic.Pointer as it's used with the single writer assumption.
-			writer *btree
-		}
+		current *btree
 
 		height int64
 	}
@@ -47,14 +36,12 @@ type (
 )
 
 func (u *UncommittableBatch) Commit() {
-	// TODO: or make no-op?
 	panic("uncommittable batch cannot be committed")
 }
 
 // NewTree creates a new empty Tree.
 func NewTree() *Tree {
-	root := &atomic.Pointer[btree]{}
-	root.Store(internal.NewBTree())
+	root := internal.NewBTree()
 
 	return &Tree{
 		root: root,
@@ -80,37 +67,28 @@ func (t *Tree) GetSnapshotBatch(height int64) (EphemeralBatch, bool) {
 // NewBatch creates a top-level batch.
 // It creates a copy-on-write snapshot of the tree's root btree as its working copy.
 func (t *Tree) NewBatch() EphemeralBatch {
-	base := t.root.Load()
-	// Create a copy-on-write snapshot
-	readerTree := base
-	writer := base.Copy()
+	base := t.root
 
-	reader := &atomic.Pointer[btree]{}
-	reader.Store(readerTree)
+	// Create a copy-on-write snapshot for the current
+	current := base.Copy()
 
 	return &IndexedBatch{
 		// This is a top-level batch, so parent is nil
 		parent: nil,
 
-		tree: t,
-		base: base,
-		current: &struct {
-			reader *atomic.Pointer[btree]
-			writer *btree
-		}{
-			reader: reader,
-			writer: writer,
-		},
+		tree:    t,
+		base:    base,
+		current: current,
 	}
 }
 
 func (t *Tree) UnsafeSetter() interface{ Set(key []byte, value any) } {
-	return t.root.Load()
+	return t.root
 }
 
 // Get retrieves a value for the given key from the current batch.
 func (b *IndexedBatch) Get(key []byte) any {
-	return b.current.reader.Load().Get(key)
+	return b.current.Get(key)
 }
 
 // Iterator returns an iterator over the key-value pairs in the batch
@@ -122,7 +100,10 @@ func (b *IndexedBatch) Get(key []byte) any {
 //
 // If an error occurs during initialization, this method panics.
 func (b *IndexedBatch) Iterator(start, end []byte) Iterator {
-	iter, err := b.current.reader.Load().Iterator(start, end)
+	// NOTE(ephemeral): If a snapshot is not created, the current BTree cannot be modified until the Iterator is closed.
+	snapshot := b.current.Copy()
+
+	iter, err := snapshot.Iterator(start, end)
 	if err != nil {
 		panic(err)
 	}
@@ -139,7 +120,10 @@ func (b *IndexedBatch) Iterator(start, end []byte) Iterator {
 //
 // If an error occurs during initialization, this method panics.
 func (b *IndexedBatch) ReverseIterator(start, end []byte) Iterator {
-	iter, err := b.current.reader.Load().ReverseIterator(start, end)
+	// NOTE(ephemeral): If a snapshot is not created, the current BTree cannot be modified until the Iterator is closed.
+	snapshot := b.current.Copy()
+
+	iter, err := snapshot.ReverseIterator(start, end)
 	if err != nil {
 		panic(err)
 	}
@@ -149,82 +133,43 @@ func (b *IndexedBatch) ReverseIterator(start, end []byte) Iterator {
 
 // Set adds or updates a key-value pair in the current batch.
 func (b *IndexedBatch) Set(key []byte, value any) {
-	b.write(func(tree *btree) { tree.Set(key, value) })
+	b.current.Set(key, value)
 }
 
 // Delete removes a key from the current batch.
 func (b *IndexedBatch) Delete(key []byte) {
-	b.write(func(tree *btree) { tree.Delete(key) })
-}
-
-// write executes operations on the current batch's btree.
-//
-// NOTE:
-//   - This write operation performs copy-on-write (CoW) on every execution.
-//   - Due to B-tree characteristics, this can create up to 'depth' number of new nodes
-//     compared to an implementation without CoW.
-//   - Alternative implementations to reduce this overhead include:
-//     1. Applying rwlock only at L2 (where actual write operations occur)
-//     2. Storing diffs and performing k-way merges instead of copy-on-write
-//
-// Benchmark result:
-// BenchmarkCopyPerOperation-12    	  470655	      2777 ns/op	    5230 B/op	      21 allocs/op
-//   - performing single Set/Delete operation on a B-tree with 50 million nodes
-func (b *IndexedBatch) write(cb func(tree *btree)) {
-	// Use the current batch's btree to perform operations.
-	// The current.writer is a Copy()'d btree.
-	writer := b.current.writer
-	// Execute Set or Delete operation in the callback.
-	cb(writer)
-
-	// After completing the operation, create a copy-on-write snapshot of the writer.
-	copiedWriter := writer.Copy()
-	// Store the previous snapshot in current.reader.
-	// The reader is wrapped in atomic.Pointer so it can be accessed safely from other goroutines.
-	// This ensures that other goroutines accessing the reader will use the previous snapshot.
-	b.current.reader.Store(writer)
-	// Replace writer with the copied btree.
-	// The writer doesn't need atomic.Pointer as it's used with the single writer assumption.
-	b.current.writer = copiedWriter
+	b.current.Delete(key)
 }
 
 // NewNestedBatch creates a nested batch on top of the current batch.
 // It copies the current batch's btree to create an independent workspace.
 func (b *IndexedBatch) NewNestedBatch() EphemeralBatch {
-	// Reader uses the current batch's btree.
 	// Here, current refers to the current level's -1 level batch:
 	//   -> If current is L3: points to L2's current
 	//   -> If current is L2: points to L1's current
 	//   -> If current is L1: points to tree.root
-	readerTree := b.current.reader.Load()
-
-	reader := &atomic.Pointer[btree]{}
-	reader.Store(readerTree)
-
-	// Writer is a Copy()'d btree.
-	// The writer doesn't need atomic.Pointer as it's used with the single writer assumption.
-	writer := readerTree.Copy()
+	//
+	// newCurrent is a Copy()'d btree.
+	newCurrent := b.current.Copy()
 
 	return &IndexedBatch{
 		parent: b,
-		base:   nil,
-		current: &struct {
-			reader *atomic.Pointer[btree]
-			writer *btree
-		}{
-			reader: reader,
-			writer: writer,
-		},
+
+		// base is nil for nested batches
+		base: nil,
+		tree: nil,
+
+		current: newCurrent,
 	}
 }
 
 // Commit applies the changes in the batch:
 // - For nested batches, it updates the parent batch's current pointer.
-// - For top-level batches, it swaps tree.root using atomic.CompareAndSwap().
+// - For top-level batches, it replaces tree.root with the batch's current writer.
 func (b *IndexedBatch) Commit() {
 	if b.parent != nil {
 		// Nested batch: update parent's current pointer
-		b.parent.current.reader.Store(b.current.reader.Load())
+		b.parent.current = b.current
 
 		// TODO(ephemeral): Should we panic if the L1 Batch is already committed?
 		// If we should, consider the following options:
@@ -235,18 +180,14 @@ func (b *IndexedBatch) Commit() {
 	}
 
 	if b.base != nil {
-		// Top-level batch: replace tree's root using atomic CompareAndSwap
-		if !b.tree.root.CompareAndSwap(b.base, b.current.reader.Load()) {
-			panic("commit failed: concurrent modification detected")
-		}
+		// Top-level batch: replace tree's root
+		b.tree.root = b.current
 
 		if b.height != 0 {
 			// Update the height map with the new store
-			copiedStore := b.tree.root.Load().Copy()
-			ptr := &atomic.Pointer[btree]{}
-			ptr.Store(copiedStore)
+			copiedStore := b.tree.root.Copy()
 			b.tree.heightMap.Set(b.height, &Tree{
-				root: ptr,
+				root: copiedStore,
 				// heightMap is not used for snapshot batches
 				heightMap: nil,
 			})
@@ -259,9 +200,9 @@ func (b *IndexedBatch) Commit() {
 	panic("unreachable code, base is nil & parent is nil")
 }
 
-// TODO(ephemeral):
-// 1. call baseapp.setState -> cms.GetEphemeralStore().SetHeight(height)
-// 2. call in rootmulti.Store.CacheMultiStoreWithVersion(ver int64)
+// NOTE(ephemeral): lifecycle
+//  1. call baseapp.setState -> cms.GetEphemeralStore().SetHeight(height)
+//  2. call in rootmulti.Store.CacheMultiStoreWithVersion(ver int64)
 func (b *IndexedBatch) SetHeight(height int64) {
 	b.height = height
 }

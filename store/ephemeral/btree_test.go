@@ -3,20 +3,13 @@ package ephemeral
 import (
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
-func (t *Tree) load() *btree {
-	// Load the current root btree from the atomic pointer
-	return t.root.Load()
-}
-
 func (t *Tree) get(key string) any {
-	return t.load().Get([]byte(key))
+	return t.root.Get([]byte(key))
 }
 
 // TestTreeBatchNestedBatch verifies the relationship between tree, L1 batch, and L2 batch.
@@ -48,9 +41,9 @@ func TestTreeBatchNestedBatch(t *testing.T) {
 	require.Equal(t, "beta", val, "L1 key 'b' should be 'beta' after L2 commit")
 
 	// 4. Commit L1: Tree's root pointer should change
-	originalRoot := tree.load()
+	originalRoot := tree.root
 	batchL1.Commit()
-	newRoot := tree.load()
+	newRoot := tree.root
 	require.NotEqual(t, originalRoot, newRoot, "tree's root pointer should change after L1 commit")
 
 	// Verify tree state: L1's changes should be reflected
@@ -93,102 +86,6 @@ func TestWriterReaderInconsistency(t *testing.T) {
 	require.Nil(t, val, "Key should be deleted")
 	val = batchCheck.Get([]byte("key2"))
 	require.Equal(t, "new-value", val, "New key should be present")
-}
-
-// TestL1L2Interference tests consistency of L1 reading when L2 is committed.
-// It ensures that concurrent reads see both the original and final state during the transition.
-func TestL1L2Interference(t *testing.T) {
-	// Create tree and L1 batch
-	tree := NewTree()
-	batchL1 := tree.NewBatch()
-
-	// Set initial data in L1
-	batchL1.Set([]byte("shared"), "l1-original")
-
-	// Create L2 batch and modify the same key
-	batchL2 := batchL1.NewNestedBatch()
-	batchL2.Set([]byte("shared"), "l2-modified")
-
-	// Channels for communication and synchronization
-	readyToStart := make(chan struct{})
-	readDone := make(chan struct{})
-	committedSignal := make(chan struct{})
-
-	// Track both values being observed
-	var (
-		sawOriginal  atomic.Bool
-		sawModified  atomic.Bool
-		bothObserved = make(chan struct{})
-	)
-
-	// Start reader goroutine
-	go func() {
-		<-readyToStart // Wait for signal to start
-
-		// Continue reading in an infinite loop until signaled to stop
-		for {
-			select {
-			case <-readDone:
-				return
-			default:
-				// Read value
-				val := batchL1.Get([]byte("shared"))
-
-				// Record which value was observed
-				if val == "l1-original" {
-					sawOriginal.Store(true)
-				} else if val == "l2-modified" {
-					sawModified.Store(true)
-				}
-
-				// If both values have been observed, signal success
-				if sawOriginal.Load() && sawModified.Load() {
-					select {
-					case <-bothObserved:
-						// Already closed
-					default:
-						close(bothObserved)
-					}
-				}
-			}
-		}
-	}()
-
-	// Start commit goroutine
-	go func() {
-		<-readyToStart // Wait for same signal
-
-		// Give reader time to run before committing
-		time.Sleep(20 * time.Millisecond)
-
-		t.Log("Committing L2 batch")
-		batchL2.Commit()
-
-		// Signal that commit is done
-		close(committedSignal)
-	}()
-
-	// Start the test
-	close(readyToStart)
-
-	// Wait for both values to be observed or timeout
-	select {
-	case <-bothObserved:
-		t.Log("Successfully observed both original and modified values")
-	case <-time.After(3 * time.Second):
-		t.Fatalf("Timed out waiting to observe both values - Original: %v, Modified: %v",
-			sawOriginal.Load(), sawModified.Load())
-	}
-
-	// Wait for commit to finish if it hasn't already
-	<-committedSignal
-
-	// Signal reader to stop and wait for it
-	close(readDone)
-
-	// Verify final state is correct
-	val := batchL1.Get([]byte("shared"))
-	require.Equal(t, "l2-modified", val, "L1 should have L2's value after commit")
 }
 
 // TestConcurrencyL1Batch tests creation of multiple L1 batches concurrently.

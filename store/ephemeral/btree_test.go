@@ -98,7 +98,7 @@ func TestConcurrencyL1Batch(t *testing.T) {
 	require.Nil(t, tree.get("key"), "Tree should be empty initially")
 
 	// Create multiple L1 batches
-	const numBatches = 5
+	const numBatches = 10_000
 	batches := make([]EphemeralBatch, numBatches)
 
 	// Set the same key with different values in each batch

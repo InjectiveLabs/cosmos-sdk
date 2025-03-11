@@ -141,10 +141,6 @@ func (cms Store) Write() {
 	cms.ephemeralBatch.Commit()
 }
 
-func (cms Store) SetHeight(version int64) {
-	cms.ephemeralBatch.SetHeight(version)
-}
-
 // Implements CacheWrapper.
 func (cms Store) CacheWrap() types.CacheWrap {
 	return cms.CacheMultiStore().(types.CacheWrap)

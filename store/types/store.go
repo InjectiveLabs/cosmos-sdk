@@ -160,8 +160,6 @@ type MultiStore interface {
 type CacheMultiStore interface {
 	MultiStore
 	Write() // Writes operations to underlying KVStore
-
-	SetHeight(int64) // Set the height of the CacheMultiStore(for ephemeral store)
 }
 
 // CommitMultiStore is an interface for a MultiStore without cache capabilities.

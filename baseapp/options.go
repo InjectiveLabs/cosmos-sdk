@@ -407,3 +407,11 @@ func (app *BaseApp) SetWarmupEphemeralStore(cb func(ephemeral.EphemeralBatch, db
 
 	app.cms.SetWarmupEphemeral(cb)
 }
+
+func (app *BaseApp) SetSnapshotPoolLimit(limit int64) {
+	if app.sealed {
+		panic("SetSnapshotPoolLimit() on sealed BaseApp")
+	}
+
+	app.cms.SetSnapshotPoolLimit(limit)
+}

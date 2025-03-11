@@ -217,6 +217,8 @@ type CommitMultiStore interface {
 	// TODO: Later, we should create a stage similar to CacheWarmup in BaseApp so that access is limited to what the Keeper can use, rather than granting permissions to the entire database
 	SetWarmupEphemeral(func(ephemeral.EphemeralBatch, dbm.DB) error)
 
+	SetSnapshotPoolLimit(limit int64)
+
 	// RollbackToVersion rollback the db to specific version(height).
 	RollbackToVersion(version int64) error
 

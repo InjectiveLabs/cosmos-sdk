@@ -23,6 +23,10 @@ func (ms multiStore) SetWarmupEphemeral(func(ephemeral.EphemeralBatch, dbm.DB) e
 	panic("not implemented")
 }
 
+func (ms multiStore) SetSnapshotPoolLimit(int64) {
+	panic("not implemented")
+}
+
 func (ms multiStore) GetEphemeralBatch() ephemeral.EphemeralBatch {
 	panic("not implemented")
 }

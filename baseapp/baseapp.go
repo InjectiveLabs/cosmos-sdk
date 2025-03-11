@@ -828,6 +828,11 @@ func (app *BaseApp) endBlock(_ context.Context) (sdk.EndBlock, error) {
 		}
 
 		app.AddStreamEvents(ctx.BlockHeight(), ctx.BlockTime(), eb.Events)
+		app.FlushStreamEvents(ctx.BlockHeight(), ctx.BlockTime(), StreamEventsFlush{
+			NewEvents:   []interface{}{eb.Events},
+			PrevAppHash: ctx.BlockHeader().AppHash,
+			NewAppHash:  ctx.BlockHeader().LastCommitHash,
+		})
 
 		eb.Events = sdk.MarkEventsToIndex(eb.Events, app.indexEvents)
 		endblock = eb

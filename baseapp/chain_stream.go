@@ -16,7 +16,7 @@ type StreamEvents struct {
 	Events    []abci.Event
 	Height    uint64
 	BlockTime time.Time
-	Flush     *StreamEventsFlush
+	Flush     bool
 }
 
 func (app *BaseApp) AddStreamEvents(height int64, blockTime time.Time, events []abci.Event) {
@@ -34,7 +34,7 @@ func (app *BaseApp) FlushStreamEvents(height int64, blockTime time.Time, flush S
 		app.StreamEvents <- StreamEvents{
 			Height:    uint64(height),
 			BlockTime: blockTime,
-			Flush:     &flush,
+			Flush:     true,
 		}
 	}
 }

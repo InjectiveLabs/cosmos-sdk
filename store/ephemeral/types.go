@@ -16,6 +16,8 @@ type (
 		NewBatch() EphemeralBatch
 
 		GetSnapshotBatch(height int64) (EphemeralBatch, bool)
+
+		SetSnapshotPoolLimit(limit int64)
 	}
 
 	EphemeralReader interface {
@@ -109,11 +111,11 @@ type (
 		Close() error
 	}
 
-	HeightMap interface {
-		//
+	SnapshotPool interface {
 		Get(height int64) (EphemeralStore, bool)
 
-		//
 		Set(height int64, store EphemeralStore)
+
+		Limit(length int64)
 	}
 )

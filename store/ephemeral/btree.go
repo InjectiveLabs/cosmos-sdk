@@ -11,8 +11,8 @@ var (
 
 type (
 	Tree struct {
-		root      *btree
-		heightMap HeightMap
+		root         *btree
+		snapshotPool SnapshotPool
 	}
 
 	// `IndexedBatch` implements a copy-on-write batch operation pattern.
@@ -46,13 +46,17 @@ func NewTree() *Tree {
 	return &Tree{
 		root: root,
 
-		heightMap: newHeightMap(),
+		snapshotPool: newSnapshotPool(),
 	}
+}
+
+func (t *Tree) SetSnapshotPoolLimit(limit int64) {
+	t.snapshotPool.Limit(limit)
 }
 
 // Committing a batch created here is unsafe.
 func (t *Tree) GetSnapshotBatch(height int64) (EphemeralBatch, bool) {
-	reader, ok := t.heightMap.Get(height)
+	reader, ok := t.snapshotPool.Get(height)
 	if !ok {
 		return nil, false
 	}
@@ -186,10 +190,10 @@ func (b *IndexedBatch) Commit() {
 		if b.height != 0 {
 			// Update the height map with the new store
 			copiedStore := b.tree.root.Copy()
-			b.tree.heightMap.Set(b.height, &Tree{
+			b.tree.snapshotPool.Set(b.height, &Tree{
 				root: copiedStore,
-				// heightMap is not used for snapshot batches
-				heightMap: nil,
+				// snapshotPool is not used for snapshot batches
+				snapshotPool: nil,
 			})
 		}
 

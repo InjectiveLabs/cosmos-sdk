@@ -1,6 +1,8 @@
 package ephemeral
 
 import (
+	"sync/atomic"
+
 	"cosmossdk.io/store/ephemeral/internal"
 )
 
@@ -11,7 +13,7 @@ var (
 
 type (
 	Tree struct {
-		root         *btree
+		root         *atomic.Pointer[btree]
 		snapshotPool SnapshotPool
 	}
 
@@ -41,7 +43,10 @@ func (u *UncommittableBatch) Commit() {
 
 // NewTree creates a new empty Tree.
 func NewTree() *Tree {
-	root := internal.NewBTree()
+	tree := internal.NewBTree()
+
+	root := &atomic.Pointer[btree]{}
+	root.Store(tree)
 
 	return &Tree{
 		root: root,
@@ -71,7 +76,7 @@ func (t *Tree) GetSnapshotBatch(height int64) (EphemeralBatch, bool) {
 // NewBatch creates a top-level batch.
 // It creates a copy-on-write snapshot of the tree's root btree as its working copy.
 func (t *Tree) NewBatch() EphemeralBatch {
-	base := t.root
+	base := t.root.Load()
 
 	// Create a copy-on-write snapshot for the current
 	current := base.Copy()
@@ -180,14 +185,19 @@ func (b *IndexedBatch) Commit() {
 	}
 
 	if b.base != nil {
-		// Top-level batch: replace tree's root
-		b.tree.root = b.current
+		// Top-level batch: replace tree's root using atomic CompareAndSwap
+		if !b.tree.root.CompareAndSwap(b.base, b.current) {
+			panic("commit failed: concurrent modification detected")
+		}
 
 		if b.height != 0 {
 			// Update the height map with the new store
-			copiedStore := b.tree.root.Copy()
+			copiedStore := b.current.Copy()
+			root := &atomic.Pointer[btree]{}
+			root.Store(copiedStore)
+
 			b.tree.snapshotPool.Set(b.height, &Tree{
-				root: copiedStore,
+				root: root,
 				// snapshotPool is not used for snapshot batches
 				snapshotPool: nil,
 			})

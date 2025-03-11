@@ -9,7 +9,7 @@ import (
 )
 
 func (t *Tree) get(key string) any {
-	return t.root.Get([]byte(key))
+	return t.root.Load().Get([]byte(key))
 }
 
 // TestTreeBatchNestedBatch verifies the relationship between tree, L1 batch, and L2 batch.
@@ -41,9 +41,9 @@ func TestTreeBatchNestedBatch(t *testing.T) {
 	require.Equal(t, "beta", val, "L1 key 'b' should be 'beta' after L2 commit")
 
 	// 4. Commit L1: Tree's root pointer should change
-	originalRoot := tree.root
+	originalRoot := tree.root.Load()
 	batchL1.Commit()
-	newRoot := tree.root
+	newRoot := tree.root.Load()
 	require.NotEqual(t, originalRoot, newRoot, "tree's root pointer should change after L1 commit")
 
 	// Verify tree state: L1's changes should be reflected
@@ -318,14 +318,15 @@ func TestBatchIteratorIsolation(t *testing.T) {
 	require.Contains(t, iteratorPairs2, "init-key-3", "New iterator should still see deleted key")
 }
 
-// TestHeightMapAndSnapshots verifies the functionality of height maps and snapshot retrieval.
+// TestSnapshotPool verifies the functionality of height maps and snapshot retrieval.
 // It ensures that batches can be created with specific heights and later retrieved correctly.
-func TestHeightMapAndSnapshots(t *testing.T) {
+func TestSnapshotPool(t *testing.T) {
 	// Create tree
 	tree := NewTree()
+	tree.SetSnapshotPoolLimit(10)
 
 	// Add data at different heights
-	heights := []int64{10, 20, 30}
+	heights := []int64{10, 11, 12}
 	expectedValues := make(map[int64]string)
 
 	for _, height := range heights {

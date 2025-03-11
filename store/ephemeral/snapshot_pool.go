@@ -11,8 +11,9 @@ type (
 	}
 
 	snapshotItem struct {
-		mtx   *sync.RWMutex
-		store EphemeralStore
+		mtx    *sync.RWMutex
+		store  EphemeralStore
+		height int64
 	}
 )
 
@@ -22,8 +23,9 @@ func newSnapshotPool() *snapshotPool {
 	list := make([]*snapshotItem, defaultLimit)
 	for i := 0; i < defaultLimit; i++ {
 		list[i] = &snapshotItem{
-			mtx:   &sync.RWMutex{},
-			store: nil,
+			mtx:    &sync.RWMutex{},
+			store:  nil,
+			height: 0,
 		}
 	}
 
@@ -34,10 +36,14 @@ func (p *snapshotPool) Get(height int64) (EphemeralStore, bool) {
 	idx := height % p.limit
 
 	p.list[idx].mtx.RLock()
-	store := p.list[idx].store
+	item := p.list[idx]
 	p.list[idx].mtx.RUnlock()
 
-	return store, store != nil
+	if item.height != height {
+		return nil, false
+	}
+
+	return item.store, item.store != nil
 }
 
 func (p *snapshotPool) Set(height int64, store EphemeralStore) {
@@ -45,6 +51,7 @@ func (p *snapshotPool) Set(height int64, store EphemeralStore) {
 
 	p.list[idx].mtx.Lock()
 	p.list[idx].store = store
+	p.list[idx].height = height
 	p.list[idx].mtx.Unlock()
 }
 
@@ -53,8 +60,9 @@ func (p *snapshotPool) Limit(limit int64) {
 	p.list = make([]*snapshotItem, limit)
 	for i := int64(0); i < limit; i++ {
 		p.list[i] = &snapshotItem{
-			mtx:   &sync.RWMutex{},
-			store: nil,
+			mtx:    &sync.RWMutex{},
+			store:  nil,
+			height: 0,
 		}
 	}
 }

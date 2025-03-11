@@ -28,7 +28,7 @@ type Store struct {
 	db             types.CacheKVStore
 	stores         map[types.StoreKey]types.CacheWrap
 	keys           map[string]types.StoreKey
-	ephemeralStore ephemeral.EphemeralCacheKVStore
+	ephemeralBatch ephemeral.EphemeralBatch
 
 	traceWriter  io.Writer
 	traceContext types.TraceContext
@@ -42,13 +42,13 @@ var _ types.CacheMultiStore = Store{}
 func NewFromKVStore(
 	store types.KVStore, stores map[types.StoreKey]types.CacheWrapper,
 	keys map[string]types.StoreKey, traceWriter io.Writer, traceContext types.TraceContext,
-	ephermalStore ephemeral.EphemeralKVStore,
+	ephermalStore ephemeral.EphemeralBatch,
 ) Store {
 	cms := Store{
 		db:             cachekv.NewStore(store),
 		stores:         make(map[types.StoreKey]types.CacheWrap, len(stores)),
 		keys:           keys,
-		ephemeralStore: ephemeral.NewEphemeralCacheKV(ephermalStore),
+		ephemeralBatch: ephermalStore.NewNestedBatch(),
 
 		traceWriter:  traceWriter,
 		traceContext: traceContext,
@@ -72,18 +72,25 @@ func NewFromKVStore(
 // CacheWrapper objects. Each CacheWrapper store is a branched store.
 func NewStore(
 	db dbm.DB, stores map[types.StoreKey]types.CacheWrapper, keys map[string]types.StoreKey,
-	traceWriter io.Writer, traceContext types.TraceContext, ephemeralStore ephemeral.EphemeralKVStore,
+	traceWriter io.Writer, traceContext types.TraceContext, ephemeralStore ephemeral.EphemeralBatch,
 ) Store {
 	return NewFromKVStore(dbadapter.Store{DB: db}, stores, keys, traceWriter, traceContext, ephemeralStore)
 }
 
-func newCacheMultiStoreFromCMS(cms Store, ecs ephemeral.EphemeralKVStore) Store {
+func newCacheMultiStoreFromCMS(cms Store, ecs ephemeral.EphemeralBatch) Store {
 	stores := make(map[types.StoreKey]types.CacheWrapper)
 	for k, v := range cms.stores {
 		stores[k] = v
 	}
 
-	return NewFromKVStore(cms.db, stores, nil, cms.traceWriter, cms.traceContext, ecs)
+	return NewFromKVStore(
+		cms.db,
+		stores,
+		nil,
+		cms.traceWriter,
+		cms.traceContext,
+		ecs.NewNestedBatch(),
+	)
 }
 
 // SetTracer sets the tracer for the MultiStore that the underlying
@@ -131,7 +138,11 @@ func (cms Store) Write() {
 		store.Write()
 	}
 
-	cms.ephemeralStore.Write()
+	cms.ephemeralBatch.Commit()
+}
+
+func (cms Store) SetHeight(version int64) {
+	cms.ephemeralBatch.SetHeight(version)
 }
 
 // Implements CacheWrapper.
@@ -146,7 +157,7 @@ func (cms Store) CacheWrapWithTrace(_ io.Writer, _ types.TraceContext) types.Cac
 
 // Implements MultiStore.
 func (cms Store) CacheMultiStore() types.CacheMultiStore {
-	return newCacheMultiStoreFromCMS(cms, cms.ephemeralStore)
+	return newCacheMultiStoreFromCMS(cms, cms.ephemeralBatch)
 }
 
 // CacheMultiStoreWithVersion implements the MultiStore interface. It will panic
@@ -176,6 +187,6 @@ func (cms Store) GetKVStore(key types.StoreKey) types.KVStore {
 	return store.(types.KVStore)
 }
 
-func (cms Store) GetEphemeralKVStore() ephemeral.EphemeralKVStore {
-	return cms.ephemeralStore
+func (cms Store) GetEphemeralBatch() ephemeral.EphemeralBatch {
+	return cms.ephemeralBatch
 }

@@ -19,11 +19,11 @@ type multiStore struct {
 	kv map[storetypes.StoreKey]kvStore
 }
 
-func (ms multiStore) SetWarmupEphemeral(func(ephemeral.EphemeralKVStore, dbm.DB) error) {
+func (ms multiStore) SetWarmupEphemeral(func(ephemeral.EphemeralBatch, dbm.DB) error) {
 	panic("not implemented")
 }
 
-func (ms multiStore) GetEphemeralKVStore() ephemeral.EphemeralKVStore {
+func (ms multiStore) GetEphemeralBatch() ephemeral.EphemeralBatch {
 	panic("not implemented")
 }
 

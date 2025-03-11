@@ -13,6 +13,9 @@ var (
 
 type (
 	Tree struct {
+		// root is an atomic pointer to the current root of the btree.
+		// When a batch is committed, it creates a new root node and atomically
+		// swaps it with the existing one.
 		root         *atomic.Pointer[btree]
 		snapshotPool SnapshotPool
 	}

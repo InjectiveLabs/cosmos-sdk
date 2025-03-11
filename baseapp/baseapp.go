@@ -204,6 +204,10 @@ type BaseApp struct {
 	EnableStreamer bool
 	StreamEvents   chan StreamEvents
 
+	EnablePublish bool
+	PublishEvents chan PublishEventFlush
+	flushData     PublishEventFlush
+
 	traceFlightRecorder *metrics.TraceRecorder
 }
 
@@ -226,6 +230,7 @@ func NewBaseApp(
 		sigverifyTx:      true,
 		queryGasLimit:    math.MaxUint64,
 		StreamEvents:     make(chan StreamEvents),
+		PublishEvents:    make(chan PublishEventFlush),
 	}
 
 	for _, option := range options {
@@ -759,7 +764,7 @@ func (app *BaseApp) beginBlock(_ *abci.RequestFinalizeBlock) (sdk.BeginBlock, er
 			)
 		}
 
-		app.AddStreamEvents(ctx.BlockHeight(), ctx.BlockTime(), resp.Events)
+		app.AddStreamEvents(ctx.BlockHeight(), ctx.BlockTime(), resp.Events, false)
 
 		resp.Events = sdk.MarkEventsToIndex(resp.Events, app.indexEvents)
 	}
@@ -794,7 +799,7 @@ func (app *BaseApp) deliverTx(tx []byte) *abci.ExecTxResult {
 	}
 
 	ctx := app.finalizeBlockState.Context()
-	app.AddStreamEvents(ctx.BlockHeight(), ctx.BlockTime(), result.Events)
+	app.AddStreamEvents(ctx.BlockHeight(), ctx.BlockTime(), result.Events, false)
 
 	resp = &abci.ExecTxResult{
 		GasWanted: int64(gInfo.GasWanted),
@@ -827,7 +832,7 @@ func (app *BaseApp) endBlock(_ context.Context) (sdk.EndBlock, error) {
 			)
 		}
 
-		app.AddStreamEvents(ctx.BlockHeight(), ctx.BlockTime(), eb.Events)
+		app.AddStreamEvents(ctx.BlockHeight(), ctx.BlockTime(), eb.Events, true)
 
 		eb.Events = sdk.MarkEventsToIndex(eb.Events, app.indexEvents)
 		endblock = eb

@@ -29,17 +29,15 @@ func (e StringPublishEvent) Serialize() []byte {
 	return []byte(e.data)
 }
 
-func getStreamEventFlushChan(app *baseapp.BaseApp) chan types.PublishEvents {
-	app.EnableStreamer = true
-	publishEventChan := make(chan types.PublishEvents)
+func getStreamEventFlushChan(app *baseapp.BaseApp) chan baseapp.PublishEventFlush {
+	app.EnablePublish = true
+	publishEventChan := make(chan baseapp.PublishEventFlush)
 
 	go func() {
 		for {
 			select {
-			case e := <-app.StreamEvents:
-				if e.Flush != nil {
-					publishEventChan <- e.Flush.PublishEvents
-				}
+			case e := <-app.PublishEvents:
+				publishEventChan <- e
 			}
 		}
 	}()
@@ -101,7 +99,7 @@ func TestPublishEvent_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	res, err := app.FinalizeBlock(&abci.RequestFinalizeBlock{Height: 1})
 	require.NoError(t, err)
 
-	require.Len(t, res.Events, 4)
+	require.Len(t, res.Events, 2)
 
 	require.Equal(t, "sometype", res.Events[0].Type)
 	require.Equal(t, "foo", res.Events[0].Attributes[0].Key)
@@ -109,15 +107,11 @@ func TestPublishEvent_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	require.Equal(t, "mode", res.Events[0].Attributes[1].Key)
 	require.Equal(t, "BeginBlock", res.Events[0].Attributes[1].Value)
 
-	require.Equal(t, "publish event placeholder", res.Events[1].Type)
-
-	require.Equal(t, "anothertype", res.Events[2].Type)
-	require.Equal(t, "foo", res.Events[2].Attributes[0].Key)
-	require.Equal(t, "bar", res.Events[2].Attributes[0].Value)
-	require.Equal(t, "mode", res.Events[2].Attributes[1].Key)
-	require.Equal(t, "EndBlock", res.Events[2].Attributes[1].Value)
-
-	require.Equal(t, "publish event placeholder", res.Events[3].Type)
+	require.Equal(t, "anothertype", res.Events[1].Type)
+	require.Equal(t, "foo", res.Events[1].Attributes[0].Key)
+	require.Equal(t, "bar", res.Events[1].Attributes[0].Value)
+	require.Equal(t, "mode", res.Events[1].Attributes[1].Key)
+	require.Equal(t, "EndBlock", res.Events[1].Attributes[1].Value)
 
 	_, err = app.Commit()
 	require.NoError(t, err)
@@ -125,9 +119,17 @@ func TestPublishEvent_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	require.Equal(t, int64(1), app.LastBlockHeight())
 
 	pevts := <-publishEventChan
-	require.Len(t, pevts, 2)
-	require.Equal(t, "sometype2", pevts[0].ToString())
-	require.Equal(t, "anothertype2", pevts[1].ToString())
+	require.Len(t, pevts.PublishEvents, 2)
+	require.Equal(t, "sometype2", pevts.PublishEvents[0].ToString())
+	require.Equal(t, "anothertype2", pevts.PublishEvents[1].ToString())
+
+	require.Len(t, pevts.AbciEvents, 2)
+
+	require.Len(t, pevts.TrueOrder, 4)
+	require.Equal(t, pevts.TrueOrder, []string{
+		"abci", "custom", "abci", "custom",
+	})
+
 }
 
 func TestPublishEvent_FinalizeBlock_DeliverTx(t *testing.T) {
@@ -148,6 +150,8 @@ func TestPublishEvent_FinalizeBlock_DeliverTx(t *testing.T) {
 
 	nBlocks := 3
 	txPerHeight := 5
+
+	var lastAppHash []byte
 
 	for blockN := 0; blockN < nBlocks; blockN++ {
 
@@ -173,17 +177,23 @@ func TestPublishEvent_FinalizeBlock_DeliverTx(t *testing.T) {
 			require.True(t, res.TxResults[i].IsOK(), fmt.Sprintf("%v", res))
 
 			events := res.TxResults[i].GetEvents()
-			require.Len(t, events, 5, "should contain ante handler, message type and counter events respectively")
+			require.Len(t, events, 3, "should contain ante handler, message type and counter events respectively")
 			require.Equal(t, sdk.MarkEventsToIndex(counterEvent("ante_handler", counter).ToABCIEvents(), map[string]struct{}{})[0], events[0], "ante handler event")
-			require.Equal(t, "publish event placeholder", events[1].Type, "ante handler publish event placeholder")
-			require.Equal(t, sdk.MarkEventsToIndex(counterEvent(sdk.EventTypeMessage, counter).ToABCIEvents(), map[string]struct{}{})[0].Attributes[0], events[3].Attributes[0], "msg handler update counter event")
-			require.Equal(t, "publish event placeholder", events[4].Type, "msg handler publish event placeholder")
+			require.Equal(t, sdk.MarkEventsToIndex(counterEvent(sdk.EventTypeMessage, counter).ToABCIEvents(), map[string]struct{}{})[0].Attributes[0], events[2].Attributes[0], "msg handler update counter event")
 		}
 
 		_, err = suite.baseApp.Commit()
 		require.NoError(t, err)
 
 		pevts := <-publishEventChan
-		require.Len(t, pevts, 2*txPerHeight)
+		require.Equal(t, pevts.Height, int64(blockN+1))
+		if blockN > 0 {
+			require.Equal(t, pevts.PrevAppHash, lastAppHash, "should be the same as last app hash")
+		}
+		require.Equal(t, pevts.NewAppHash, res.AppHash)
+		require.Len(t, pevts.PublishEvents, 2*txPerHeight)
+		require.Len(t, pevts.TrueOrder, 5*txPerHeight)
+
+		lastAppHash = res.AppHash
 	}
 }

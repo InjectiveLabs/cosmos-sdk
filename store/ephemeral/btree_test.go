@@ -442,13 +442,14 @@ func TestNestedSnapshotBatches(t *testing.T) {
 func BenchmarkTreeBatchSet(b *testing.B) {
 	b.ReportAllocs()
 	tree := NewTree()
-	setter := tree.UnsafeSetter()
+	batch := tree.NewBatch()
 	for i := 0; i < 50_000_000; i++ {
-		setter.Set(
+		batch.Set(
 			[]byte(fmt.Sprintf("key-%d", i)),
 			fmt.Sprintf("value-%d", i),
 		)
 	}
+	batch.Commit()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -5,50 +5,14 @@ import (
 	"errors"
 )
 
-var _ EphemeralStore = (*PrefixEphemeralStore)(nil)
 var _ EphemeralBatch = (*PrefixEphemeralBatch)(nil)
 var _ Iterator = (*prefixIterator)(nil)
 
-// PrefixEphemeralStore is similar to prefix.Store
-// It gives access only to a limited subset of the store
-// for convenience or safety
-type PrefixEphemeralStore struct {
-	parent EphemeralStore
-	prefix []byte
-}
-
-// NewPrefixEphemeralStore creates a new store with the given prefix
-func NewPrefixEphemeralStore(parent EphemeralStore, prefix []byte) *PrefixEphemeralStore {
-	return &PrefixEphemeralStore{
+func NewPrefixEphemeralBatch(parent EphemeralBatch, prefix []byte) *PrefixEphemeralBatch {
+	return &PrefixEphemeralBatch{
 		parent: parent,
 		prefix: prefix,
 	}
-}
-
-// NewBatch creates a new batch from the parent with the prefix
-func (s *PrefixEphemeralStore) NewBatch() EphemeralBatch {
-	return &PrefixEphemeralBatch{
-		parent: s.parent.NewBatch(),
-		prefix: s.prefix,
-	}
-}
-
-// GetSnapshotBatch gets a snapshot batch from the parent with the prefix
-func (s *PrefixEphemeralStore) GetSnapshotBatch(height int64) (EphemeralBatch, bool) {
-	batch, ok := s.parent.GetSnapshotBatch(height)
-	if !ok {
-		return nil, false
-	}
-
-	return &PrefixEphemeralBatch{
-		parent: batch,
-		prefix: s.prefix,
-	}, true
-}
-
-// SetSnapshotPoolLimit sets the snapshot pool limit on the parent store
-func (s *PrefixEphemeralStore) SetSnapshotPoolLimit(limit int64) {
-	s.parent.SetSnapshotPoolLimit(limit)
 }
 
 // PrefixEphemeralBatch is a wrapper for EphemeralBatch that prefixes all keys

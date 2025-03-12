@@ -59,7 +59,9 @@ type (
 		// After the operation completes, the reader pointer is updated to current.writer
 		// and the writer is replaced with a Copy()'d btree.
 		Delete(key []byte)
+	}
 
+	EphemeralCommitter interface {
 		// Commit applies the changes in the current batch:
 		// - For nested batches, it updates the parent batch's current pointer.
 		// - For top-level batches, it swaps tree.root using atomic.CompareAndSwap().
@@ -78,6 +80,7 @@ type (
 
 		EphemeralReader
 		EphemeralWriter
+		EphemeralCommitter
 
 		// Used only in the top-level batch, it calls HeightMap.Set in (EphemeralWriter).Commit.
 		SetHeight(height int64)

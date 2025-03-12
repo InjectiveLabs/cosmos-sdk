@@ -130,10 +130,6 @@ func DisableBlockGasMeter() func(*BaseApp) {
 	return func(app *BaseApp) { app.SetDisableBlockGasMeter(true) }
 }
 
-func SetupWarmupEphemeralStore(cb func(ephemeral.EphemeralBatch, dbm.DB) error) func(*BaseApp) {
-	return func(app *BaseApp) { app.SetWarmupEphemeralStore(cb) }
-}
-
 func SetupSnapshotPoolLimit(limit int64) func(*BaseApp) {
 	return func(app *BaseApp) { app.SetSnapshotPoolLimit(limit) }
 }
@@ -408,12 +404,12 @@ func (app *BaseApp) SetGRPCQueryRouter(grpcQueryRouter *GRPCQueryRouter) {
 	app.grpcQueryRouter = grpcQueryRouter
 }
 
-func (app *BaseApp) SetWarmupEphemeralStore(cb func(ephemeral.EphemeralBatch, dbm.DB) error) {
+func (app *BaseApp) SetWarmupEphemeralStore(cbs ...func(func(storetypes.StoreKey) storetypes.KVStore, ephemeral.EphemeralBatch)) {
 	if app.sealed {
 		panic("SetWarmupEphemeralStore() on sealed BaseApp")
 	}
 
-	app.cms.SetWarmupEphemeral(cb)
+	app.cms.SetWarmupEphemeral(cbs...)
 }
 
 func (app *BaseApp) SetSnapshotPoolLimit(limit int64) {

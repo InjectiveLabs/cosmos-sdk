@@ -306,15 +306,15 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 	db := dbm.NewMemDB()
 
 	warmupCallback := func(
+		_ func(storetypes.StoreKey) storetypes.KVStore,
 		batch ephemeral.EphemeralBatch,
-		db dbm.DB,
-	) error {
+	) {
 		typedKV := ephemeral.
 			NewTypedBatch[*cmtproto.Block](batch)
 
 		val, err := db.Get([]byte("s/latest"))
 		if err != nil || val == nil {
-			return nil
+			return
 		}
 
 		var lastHeight int64
@@ -326,8 +326,6 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 			}
 			typedKV.Set([]byte(fmt.Sprintf("block-%d", i)), block)
 		}
-
-		return nil
 	}
 
 	newApp := func(db dbm.DB) *baseapp.BaseApp {
@@ -337,6 +335,7 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 			db,
 			nil,
 		)
+
 		app.SetWarmupEphemeralStore(warmupCallback)
 		app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
 			ekv := ctx.EphemeralBatch()

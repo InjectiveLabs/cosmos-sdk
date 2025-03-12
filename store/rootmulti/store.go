@@ -77,9 +77,10 @@ type Store struct {
 	commitHeader        cmtproto.Header
 	commitSync          bool
 
-	ephemeralStore  ephemeral.EphemeralStore
-	ephemeralBatch  ephemeral.EphemeralBatch
-	warmupEphemeral func(ephemeral.EphemeralBatch, dbm.DB) error
+	ephemeralStore    ephemeral.EphemeralStore
+	ephemeralBatchMtx sync.RWMutex
+	ephemeralBatch    ephemeral.EphemeralBatch
+	warmupEphemeral   []func(func(types.StoreKey) types.KVStore, ephemeral.EphemeralBatch)
 }
 
 var (
@@ -152,7 +153,7 @@ func (rs *Store) SetIAVLDisableFastNode(disableFastNode bool) {
 	rs.iavlDisableFastNode = disableFastNode
 }
 
-func (rs *Store) SetWarmupEphemeral(f func(ephemeral.EphemeralBatch, dbm.DB) error) {
+func (rs *Store) SetWarmupEphemeral(f ...func(func(types.StoreKey) types.KVStore, ephemeral.EphemeralBatch)) {
 	rs.warmupEphemeral = f
 }
 
@@ -320,11 +321,16 @@ func (rs *Store) loadVersion(ver int64, upgrades *types.StoreUpgrades) error {
 
 	if rs.warmupEphemeral != nil {
 		rs.ephemeralBatch.SetHeight(ver)
-		if err := rs.warmupEphemeral(rs.ephemeralBatch, rs.db); err != nil {
-			return err
+		for _, f := range rs.warmupEphemeral {
+			uncommittableBatch := &ephemeral.UncommittableBatch{EphemeralBatch: rs.ephemeralBatch}
+			f(rs.GetKVStore, uncommittableBatch)
 		}
 		rs.ephemeralBatch.Commit()
-		rs.ephemeralBatch = rs.ephemeralStore.NewBatch()
+
+		batch := rs.ephemeralStore.NewBatch()
+		rs.ephemeralBatchMtx.Lock()
+		rs.ephemeralBatch = batch
+		rs.ephemeralBatchMtx.Unlock()
 	}
 
 	// load any snapshot heights we missed from disk to be pruned on the next run
@@ -521,7 +527,11 @@ func (rs *Store) Commit() types.CommitID {
 	defer rs.flushMetadata(rs.db, version, rs.lastCommitInfo)
 	defer func() {
 		rs.ephemeralBatch.Commit()
-		rs.ephemeralBatch = rs.ephemeralStore.NewBatch()
+
+		newBatch := rs.ephemeralStore.NewBatch()
+		rs.ephemeralBatchMtx.Lock()
+		rs.ephemeralBatch = newBatch
+		rs.ephemeralBatchMtx.Unlock()
 	}()
 
 	// remove remnants of removed stores
@@ -603,13 +613,18 @@ func (rs *Store) CacheMultiStore() types.CacheMultiStore {
 		}
 		stores[k] = store
 	}
+
+	rs.ephemeralBatchMtx.RLock()
+	eb := rs.ephemeralBatch
+	rs.ephemeralBatchMtx.RUnlock()
+
 	return cachemulti.NewStore(
 		rs.db,
 		stores,
 		rs.keysByName,
 		rs.traceWriter,
 		rs.getTracingContext(),
-		rs.ephemeralBatch,
+		eb,
 	)
 }
 
@@ -674,7 +689,8 @@ func (rs *Store) CacheMultiStoreWithVersion(version int64) (types.CacheMultiStor
 	if !exists {
 		if rs.warmupEphemeral == nil {
 			// NOTE(ephemeral): temporary fallback for testing
-			ephemeralSnapshotBatch = rs.ephemeralStore.NewBatch()
+			batch := rs.ephemeralStore.NewBatch()
+			ephemeralSnapshotBatch = batch
 		} else {
 			return nil, fmt.Errorf("no ephemeral snapshot found for version %d", version)
 		}

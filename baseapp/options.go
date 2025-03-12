@@ -130,6 +130,14 @@ func DisableBlockGasMeter() func(*BaseApp) {
 	return func(app *BaseApp) { app.SetDisableBlockGasMeter(true) }
 }
 
+func SetupWarmupEphemeralStore(cb func(ephemeral.EphemeralBatch, dbm.DB) error) func(*BaseApp) {
+	return func(app *BaseApp) { app.SetWarmupEphemeralStore(cb) }
+}
+
+func SetupSnapshotPoolLimit(limit int64) func(*BaseApp) {
+	return func(app *BaseApp) { app.SetSnapshotPoolLimit(limit) }
+}
+
 func (app *BaseApp) SetName(name string) {
 	if app.sealed {
 		panic("SetName() on sealed BaseApp")

@@ -1,6 +1,8 @@
 package baseapp
 
 import (
+	"encoding/json"
+
 	abci "github.com/cometbft/cometbft/abci/types"
 	types "github.com/cosmos/cosmos-sdk/types"
 )
@@ -18,4 +20,8 @@ func (app *BaseApp) PublishBlockEvents(flush PublishEventFlush) {
 	if app.EnablePublish {
 		app.PublishEvents <- flush
 	}
+}
+
+func (p *PublishEventFlush) Marshal() ([]byte, error) {
+	return json.Marshal(p)
 }

@@ -321,8 +321,9 @@ func (rs *Store) loadVersion(ver int64, upgrades *types.StoreUpgrades) error {
 
 	if rs.warmupEphemeral != nil {
 		rs.ephemeralBatch.SetHeight(ver)
+
+		uncommittableBatch := &ephemeral.UncommittableBatch{EphemeralBatch: rs.ephemeralBatch}
 		for _, f := range rs.warmupEphemeral {
-			uncommittableBatch := &ephemeral.UncommittableBatch{EphemeralBatch: rs.ephemeralBatch}
 			f(rs.GetKVStore, uncommittableBatch)
 		}
 		rs.ephemeralBatch.Commit()

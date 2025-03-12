@@ -70,6 +70,10 @@ type (
 	}
 
 	// EphemeralBatch defines operations that can be performed on a batch.
+	//
+	// The implementation of Ephemeral{Reader,Writer} in Batch is not thread-safe.
+	// Therefore, when concurrent access is required, users should protect it
+	// using rwlock at the application level.
 	EphemeralBatch interface {
 		// NewNestedBatch creates a nested batch on top of the current batch.
 		// It makes a copy (BTree.Copy()) of the current batch's btree to create an independent workspace.

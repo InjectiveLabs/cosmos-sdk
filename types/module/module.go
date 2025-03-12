@@ -42,6 +42,7 @@ import (
 	"cosmossdk.io/core/appmodule"
 	"cosmossdk.io/core/genesis"
 	errorsmod "cosmossdk.io/errors"
+	"cosmossdk.io/store/ephemeral"
 	storetypes "cosmossdk.io/store/types"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -233,6 +234,10 @@ type HasABCIEndblock HasABCIEndBlock
 type HasABCIEndBlock interface {
 	AppModule
 	EndBlock(context.Context) ([]abci.ValidatorUpdate, error)
+}
+
+type HasWarmupEphemeralStore interface {
+	Warmup(ephemeral.EphemeralWriter) error
 }
 
 var (
@@ -473,6 +478,14 @@ func (m *Manager) RegisterServices(cfg Configurator) error {
 	}
 
 	return nil
+}
+
+func (m *Manager) Warmup(batch ephemeral.EphemeralWriter) {
+	for _, module := range m.Modules {
+		if module, ok := module.(HasWarmupEphemeralStore); ok {
+			module.Warmup(batch)
+		}
+	}
 }
 
 // InitGenesis performs init genesis functionality for modules. Exactly one

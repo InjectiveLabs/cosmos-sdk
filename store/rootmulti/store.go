@@ -77,9 +77,8 @@ type Store struct {
 	commitHeader        cmtproto.Header
 	commitSync          bool
 
-	ephemeralStore  ephemeral.EphemeralStore
-	ephemeralBatch  ephemeral.EphemeralBatch
-	warmupEphemeral func(ephemeral.EphemeralBatch, dbm.DB) error
+	ephemeralStore ephemeral.EphemeralStore
+	ephemeralBatch ephemeral.EphemeralBatch
 }
 
 var (
@@ -150,10 +149,6 @@ func (rs *Store) SetIAVLCacheSize(cacheSize int) {
 
 func (rs *Store) SetIAVLDisableFastNode(disableFastNode bool) {
 	rs.iavlDisableFastNode = disableFastNode
-}
-
-func (rs *Store) SetWarmupEphemeral(f func(ephemeral.EphemeralBatch, dbm.DB) error) {
-	rs.warmupEphemeral = f
 }
 
 func (rs *Store) SetSnapshotPoolLimit(limit int64) {
@@ -317,15 +312,6 @@ func (rs *Store) loadVersion(ver int64, upgrades *types.StoreUpgrades) error {
 
 	rs.lastCommitInfo = cInfo
 	rs.stores = newStores
-
-	if rs.warmupEphemeral != nil {
-		rs.ephemeralBatch.SetHeight(ver)
-		if err := rs.warmupEphemeral(rs.ephemeralBatch, rs.db); err != nil {
-			return err
-		}
-		rs.ephemeralBatch.Commit()
-		rs.ephemeralBatch = rs.ephemeralStore.NewBatch()
-	}
 
 	// load any snapshot heights we missed from disk to be pruned on the next run
 	if err := rs.pruningManager.LoadSnapshotHeights(rs.db); err != nil {
@@ -672,12 +658,8 @@ func (rs *Store) CacheMultiStoreWithVersion(version int64) (types.CacheMultiStor
 
 	ephemeralSnapshotBatch, exists := rs.ephemeralStore.GetSnapshotBatch(version)
 	if !exists {
-		if rs.warmupEphemeral == nil {
-			// NOTE(ephemeral): temporary fallback for testing
-			ephemeralSnapshotBatch = rs.ephemeralStore.NewBatch()
-		} else {
-			return nil, fmt.Errorf("no ephemeral snapshot found for version %d", version)
-		}
+		// NOTE(ephemeral): temporary fallback for testing
+		ephemeralSnapshotBatch = rs.ephemeralStore.NewBatch()
 	}
 
 	return cachemulti.NewStore(

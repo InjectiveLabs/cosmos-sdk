@@ -19,10 +19,6 @@ type multiStore struct {
 	kv map[storetypes.StoreKey]kvStore
 }
 
-func (ms multiStore) SetWarmupEphemeral(func(ephemeral.EphemeralBatch, dbm.DB) error) {
-	panic("not implemented")
-}
-
 func (ms multiStore) SetSnapshotPoolLimit(int64) {
 	panic("not implemented")
 }

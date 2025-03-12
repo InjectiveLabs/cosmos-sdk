@@ -212,9 +212,7 @@ type CommitMultiStore interface {
 	// SetIAVLDisableFastNode enables/disables fastnode feature on iavl.
 	SetIAVLDisableFastNode(disable bool)
 
-	// TODO: Later, we should create a stage similar to CacheWarmup in BaseApp so that access is limited to what the Keeper can use, rather than granting permissions to the entire database
-	SetWarmupEphemeral(func(ephemeral.EphemeralBatch, dbm.DB) error)
-
+	// SetSnapshotPoolLimit sets the ephemeral snapshot pool limit
 	SetSnapshotPoolLimit(limit int64)
 
 	// RollbackToVersion rollback the db to specific version(height).

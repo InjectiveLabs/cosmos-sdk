@@ -8,7 +8,6 @@ import (
 	"github.com/InjectiveLabs/metrics"
 	dbm "github.com/cosmos/cosmos-db"
 
-	"cosmossdk.io/store/ephemeral"
 	sdkmetrics "cosmossdk.io/store/metrics"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 	"cosmossdk.io/store/snapshots"
@@ -128,10 +127,6 @@ func SetOptimisticExecution(opts ...func(*oe.OptimisticExecution)) func(*BaseApp
 // DisableBlockGasMeter disables the block gas meter.
 func DisableBlockGasMeter() func(*BaseApp) {
 	return func(app *BaseApp) { app.SetDisableBlockGasMeter(true) }
-}
-
-func SetupWarmupEphemeralStore(cb func(ephemeral.EphemeralBatch, dbm.DB) error) func(*BaseApp) {
-	return func(app *BaseApp) { app.SetWarmupEphemeralStore(cb) }
 }
 
 func SetupSnapshotPoolLimit(limit int64) func(*BaseApp) {
@@ -406,14 +401,6 @@ func (app *BaseApp) SetMsgServiceRouter(msgServiceRouter *MsgServiceRouter) {
 // SetGRPCQueryRouter sets the GRPCQueryRouter of the BaseApp.
 func (app *BaseApp) SetGRPCQueryRouter(grpcQueryRouter *GRPCQueryRouter) {
 	app.grpcQueryRouter = grpcQueryRouter
-}
-
-func (app *BaseApp) SetWarmupEphemeralStore(cb func(ephemeral.EphemeralBatch, dbm.DB) error) {
-	if app.sealed {
-		panic("SetWarmupEphemeralStore() on sealed BaseApp")
-	}
-
-	app.cms.SetWarmupEphemeral(cb)
 }
 
 func (app *BaseApp) SetSnapshotPoolLimit(limit int64) {

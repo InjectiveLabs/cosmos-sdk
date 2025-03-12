@@ -42,13 +42,13 @@ var _ types.CacheMultiStore = Store{}
 func NewFromKVStore(
 	store types.KVStore, stores map[types.StoreKey]types.CacheWrapper,
 	keys map[string]types.StoreKey, traceWriter io.Writer, traceContext types.TraceContext,
-	ephermalStore ephemeral.EphemeralBatch,
+	ephemeralBatch ephemeral.EphemeralBatch,
 ) Store {
 	cms := Store{
 		db:             cachekv.NewStore(store),
 		stores:         make(map[types.StoreKey]types.CacheWrap, len(stores)),
 		keys:           keys,
-		ephemeralBatch: ephermalStore.NewNestedBatch(),
+		ephemeralBatch: ephemeralBatch.NewNestedBatch(),
 
 		traceWriter:  traceWriter,
 		traceContext: traceContext,
@@ -72,12 +72,12 @@ func NewFromKVStore(
 // CacheWrapper objects. Each CacheWrapper store is a branched store.
 func NewStore(
 	db dbm.DB, stores map[types.StoreKey]types.CacheWrapper, keys map[string]types.StoreKey,
-	traceWriter io.Writer, traceContext types.TraceContext, ephemeralStore ephemeral.EphemeralBatch,
+	traceWriter io.Writer, traceContext types.TraceContext, eb ephemeral.EphemeralBatch,
 ) Store {
-	return NewFromKVStore(dbadapter.Store{DB: db}, stores, keys, traceWriter, traceContext, ephemeralStore)
+	return NewFromKVStore(dbadapter.Store{DB: db}, stores, keys, traceWriter, traceContext, eb)
 }
 
-func newCacheMultiStoreFromCMS(cms Store, ecs ephemeral.EphemeralBatch) Store {
+func newCacheMultiStoreFromCMS(cms Store, eb ephemeral.EphemeralBatch) Store {
 	stores := make(map[types.StoreKey]types.CacheWrapper)
 	for k, v := range cms.stores {
 		stores[k] = v
@@ -89,7 +89,7 @@ func newCacheMultiStoreFromCMS(cms Store, ecs ephemeral.EphemeralBatch) Store {
 		nil,
 		cms.traceWriter,
 		cms.traceContext,
-		ecs.NewNestedBatch(),
+		eb,
 	)
 }
 

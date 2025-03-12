@@ -58,17 +58,16 @@ func (b *PrefixEphemeralBatch) Commit() {
 	b.parent.Commit()
 }
 
+func (b *PrefixEphemeralBatch) SetHeight(height int64) {
+	b.parent.SetHeight(height)
+}
+
 // NewNestedBatch creates a nested batch
 func (b *PrefixEphemeralBatch) NewNestedBatch() EphemeralBatch {
 	return &PrefixEphemeralBatch{
 		parent: b.parent.NewNestedBatch(),
 		prefix: b.prefix,
 	}
-}
-
-// SetHeight sets the height on the parent batch
-func (b *PrefixEphemeralBatch) SetHeight(height int64) {
-	b.parent.SetHeight(height)
 }
 
 // Iterator returns an iterator over the key-value pairs within the specified range

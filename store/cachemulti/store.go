@@ -48,7 +48,7 @@ func NewFromKVStore(
 		db:             cachekv.NewStore(store),
 		stores:         make(map[types.StoreKey]types.CacheWrap, len(stores)),
 		keys:           keys,
-		ephemeralBatch: ephemeralBatch.NewNestedBatch(),
+		ephemeralBatch: ephemeralBatch,
 
 		traceWriter:  traceWriter,
 		traceContext: traceContext,
@@ -89,7 +89,7 @@ func newCacheMultiStoreFromCMS(cms Store, eb ephemeral.EphemeralBatch) Store {
 		nil,
 		cms.traceWriter,
 		cms.traceContext,
-		eb,
+		eb.NewNestedBatch(),
 	)
 }
 

@@ -22,6 +22,7 @@ func TestPrefixEphemeralBatch_BasicOperations(t *testing.T) {
 	setupBatch.Set(bz("prefixkey2"), "value2")
 	setupBatch.Set(bz("other"), "other")
 	setupBatch.Commit()
+	tree.Commit()
 
 	// Create prefix batch
 	prefix := bz("prefix")
@@ -56,6 +57,7 @@ func TestPrefixEphemeralBatch_BasicOperations(t *testing.T) {
 
 	// After commit, verify with a new batch
 	prefixBatch.Commit()
+	tree.Commit()
 
 	// Create a new batch
 	newBatch := tree.NewBatch()
@@ -72,6 +74,7 @@ func TestPrefixEphemeralBatch_BasicOperations(t *testing.T) {
 	deletePrefixBatch := NewPrefixEphemeralBatch(deleteBatch, prefix)
 	deletePrefixBatch.Delete(bz("newkey"))
 	deletePrefixBatch.Commit()
+	tree.Commit()
 
 	// Check
 	checkBatch := tree.NewBatch()
@@ -96,6 +99,7 @@ func TestPrefixEphemeralBatch_Iterator(t *testing.T) {
 	setupBatch.Set(bz("prefix3"), "value3")
 	setupBatch.Set(bz("other"), "other")
 	setupBatch.Commit()
+	tree.Commit()
 
 	// Create prefix batch
 	batch := tree.NewBatch()
@@ -180,6 +184,7 @@ func TestPrefixEphemeralBatch_ReverseIterator(t *testing.T) {
 	setupBatch.Set(bz("prefix3"), "value3")
 	setupBatch.Set(bz("other"), "other")
 	setupBatch.Commit()
+	tree.Commit()
 
 	// Create prefix batch
 	batch := tree.NewBatch()
@@ -268,6 +273,7 @@ func TestPrefixEphemeralBatch_NestedBatch(t *testing.T) {
 
 	// Commit parent batch
 	parentBatch.Commit()
+	tree.Commit()
 
 	// Verify commit in new batch
 	checkBaseBatch := tree.NewBatch()
@@ -279,6 +285,42 @@ func TestPrefixEphemeralBatch_NestedBatch(t *testing.T) {
 	verifyBatch := tree.NewBatch()
 	require.Equal(t, "parentvalue", verifyBatch.Get(append(prefix, bz("parent")...)))
 	require.Equal(t, "nestedvalue", verifyBatch.Get(append(prefix, bz("nested")...)))
+}
+
+// TestPrefixEphemeralBatch_EdgeCases tests edge cases
+func TestPrefixEphemeralBatch_EdgeCases(t *testing.T) {
+	// Create base store
+	tree := NewTree()
+
+	// Test empty prefix
+	emptyPrefix := []byte{}
+	batch := tree.NewBatch()
+	emptyPrefixBatch := NewPrefixEphemeralBatch(batch, emptyPrefix)
+	emptyPrefixBatch.Set(bz("key"), "value")
+	emptyPrefixBatch.Commit()
+	tree.Commit()
+
+	// Verify in base store
+	baseBatch := tree.NewBatch()
+	require.Equal(t, "value", baseBatch.Get(bz("key")))
+
+	// Test edge case prefix (last byte is 0xFF)
+	edgePrefix := []byte{0x01, 0xFF}
+	edgeBatch := tree.NewBatch()
+	edgePrefixBatch := NewPrefixEphemeralBatch(edgeBatch, edgePrefix)
+	edgePrefixBatch.Set(bz("key"), "edgevalue")
+	edgePrefixBatch.Commit()
+	tree.Commit()
+
+	// Verify in base store
+	baseBatch = tree.NewBatch()
+	require.Equal(t, "edgevalue", baseBatch.Get(append(edgePrefix, bz("key")...)))
+
+	// Verify different prefix can't access
+	wrongPrefix := []byte{0x01, 0xFE}
+	wrongBaseBatch := tree.NewBatch()
+	wrongPrefixBatch := NewPrefixEphemeralBatch(wrongBaseBatch, wrongPrefix)
+	require.Nil(t, wrongPrefixBatch.Get(bz("key")))
 }
 
 // TestPrefixEphemeralBatch_SnapshotBatch tests snapshot batch functionality
@@ -294,12 +336,14 @@ func TestPrefixEphemeralBatch_SnapshotBatch(t *testing.T) {
 	prefixedKey := append(prefix, bz("key")...)
 	batch1.Set(prefixedKey, "value1")
 	batch1.Commit()
+	tree.Commit()
 
 	// Set data with height 2
 	batch2 := tree.NewBatch()
 	batch2.SetHeight(2)
 	batch2.Set(prefixedKey, "value2")
 	batch2.Commit()
+	tree.Commit()
 
 	// Get snapshot batch for height 1
 	snapshot1, ok := tree.GetSnapshotBatch(1)
@@ -324,42 +368,8 @@ func TestPrefixEphemeralBatch_SnapshotBatch(t *testing.T) {
 	})
 }
 
-// TestPrefixEphemeralBatch_EdgeCases tests edge cases
-func TestPrefixEphemeralBatch_EdgeCases(t *testing.T) {
-	// Create base store
-	tree := NewTree()
-
-	// Test empty prefix
-	emptyPrefix := []byte{}
-	batch := tree.NewBatch()
-	emptyPrefixBatch := NewPrefixEphemeralBatch(batch, emptyPrefix)
-	emptyPrefixBatch.Set(bz("key"), "value")
-	emptyPrefixBatch.Commit()
-
-	// Verify in base store
-	baseBatch := tree.NewBatch()
-	require.Equal(t, "value", baseBatch.Get(bz("key")))
-
-	// Test edge case prefix (last byte is 0xFF)
-	edgePrefix := []byte{0x01, 0xFF}
-	edgeBatch := tree.NewBatch()
-	edgePrefixBatch := NewPrefixEphemeralBatch(edgeBatch, edgePrefix)
-	edgePrefixBatch.Set(bz("key"), "edgevalue")
-	edgePrefixBatch.Commit()
-
-	// Verify in base store
-	baseBatch = tree.NewBatch()
-	require.Equal(t, "edgevalue", baseBatch.Get(append(edgePrefix, bz("key")...)))
-
-	// Verify different prefix can't access
-	wrongPrefix := []byte{0x01, 0xFE}
-	wrongBaseBatch := tree.NewBatch()
-	wrongPrefixBatch := NewPrefixEphemeralBatch(wrongBaseBatch, wrongPrefix)
-	require.Nil(t, wrongPrefixBatch.Get(bz("key")))
-}
-
 // Utility for generating random key-value pairs
-func genRandomKVPairs(t *testing.T, n int) []struct {
+func genRandomKVPairs(n int) []struct {
 	key   []byte
 	value []byte
 } {
@@ -395,7 +405,7 @@ func TestPrefixEphemeralBatch_RandomData(t *testing.T) {
 	prefix := bz("prefix")
 
 	// Generate random key-value pairs
-	kvs := genRandomKVPairs(t, 50)
+	kvs := genRandomKVPairs(50)
 
 	// Set data
 	baseBatch := tree.NewBatch()
@@ -404,6 +414,7 @@ func TestPrefixEphemeralBatch_RandomData(t *testing.T) {
 		batch.Set(kv.key, kv.value)
 	}
 	batch.Commit()
+	tree.Commit()
 
 	// Verify all key-value pairs
 	checkBaseBatch := tree.NewBatch()
@@ -426,6 +437,7 @@ func TestPrefixEphemeralBatch_RandomData(t *testing.T) {
 		deleteBatch.Delete(kvs[i].key)
 	}
 	deleteBatch.Commit()
+	tree.Commit()
 
 	// Verify deletions
 	finalBaseBatch := tree.NewBatch()

@@ -48,6 +48,7 @@ func TestTreeBatchNestedBatch(t *testing.T) {
 	// 4. Commit L1: Tree's root pointer should change
 	originalRoot := tree.root.Load()
 	batchL1.Commit()
+	tree.Commit()
 	newRoot := tree.root.Load()
 	require.NotEqual(t, originalRoot, newRoot, "tree's root pointer should change after L1 commit")
 
@@ -68,6 +69,7 @@ func TestWriterReaderInconsistency(t *testing.T) {
 	batchInitial := tree.NewBatch()
 	batchInitial.Set([]byte("key"), "initial-value")
 	batchInitial.Commit()
+	tree.Commit()
 
 	// Create new batch - at this point reader has data but writer is empty
 	batchL1 := tree.NewBatch()
@@ -84,6 +86,7 @@ func TestWriterReaderInconsistency(t *testing.T) {
 
 	// Commit changes
 	batchL1.Commit()
+	tree.Commit()
 
 	// Verify final state
 	batchCheck := tree.NewBatch()
@@ -127,6 +130,7 @@ func TestConcurrencyL1Batch(t *testing.T) {
 	// Commit only one batch (index 2)
 	selectedIndex := 2
 	batches[selectedIndex].Commit()
+	tree.Commit()
 
 	// Don't commit other batches
 	_ = batches
@@ -150,6 +154,7 @@ func TestConcurrentBatchCreationWithCommits(t *testing.T) {
 		initialBatch.Set([]byte(key), fmt.Sprintf("init-value-%d", i))
 	}
 	initialBatch.Commit()
+	tree.Commit()
 
 	// Number of worker goroutines creating batches
 	const numWorkers = 50
@@ -193,6 +198,7 @@ func TestConcurrentBatchCreationWithCommits(t *testing.T) {
 
 				// Commit the batch
 				batch.Commit()
+				tree.Commit()
 				commitCount++
 
 				if commitCount >= numCommits {
@@ -336,6 +342,7 @@ func TestUncommittedL2BatchChanges(t *testing.T) {
 
 	// Commit L1 batch
 	batchL1.Commit()
+	tree.Commit()
 
 	// Verify tree state - only L1's changes should be applied, not L2's
 	val = tree.get("key1")
@@ -356,6 +363,7 @@ func TestUncommittedL1BatchChanges(t *testing.T) {
 	initialBatch.Set([]byte("initial-key"), "initial-value")
 	initialBatch.Set([]byte("to-delete"), "temp-value") // Add key to be deleted later
 	initialBatch.Commit()
+	tree.Commit()
 
 	// Verify initial tree state
 	val := tree.get("initial-key")
@@ -421,6 +429,7 @@ func TestBatchIteratorIsolation(t *testing.T) {
 		setupBatch.Set(key, value)
 	}
 	setupBatch.Commit()
+	tree.Commit()
 
 	// Create two L1 batches concurrently - both have same initial view
 	batch1 := tree.NewBatch()
@@ -457,6 +466,7 @@ func TestBatchIteratorIsolation(t *testing.T) {
 
 	// Commit batch1
 	batch1.Commit()
+	tree.Commit()
 
 	// Verify changes are in the tree
 	require.Equal(t, "new-value", tree.NewBatch().Get([]byte("new-key")), "Tree should have new key after batch1 commit")
@@ -503,6 +513,7 @@ func TestSnapshotPool(t *testing.T) {
 
 		// Commit batch
 		batch.Commit()
+		tree.Commit()
 	}
 
 	// Get snapshots at each height and verify values
@@ -540,6 +551,7 @@ func TestSnapshotPool(t *testing.T) {
 	batch2.Set([]byte("multi-key-1"), "second-batch")
 	batch2.Set([]byte("multi-key-2"), "additional-value")
 	batch2.Commit()
+	tree.Commit()
 
 	// Get snapshot and verify it reflects the second batch
 	snapshotBatch, found := tree.GetSnapshotBatch(finalHeight)
@@ -573,6 +585,7 @@ func TestNestedSnapshotBatches(t *testing.T) {
 	batchL3.Commit() // L3 → L2
 	batchL2.Commit() // L2 → L1
 	batchL1.Commit() // L1 → tree
+	tree.Commit()    // tree.current -> tree.root
 
 	// Verify final value in tree
 	currentBatch := tree.NewBatch()
@@ -610,6 +623,7 @@ func BenchmarkTreeBatchSet(b *testing.B) {
 		)
 	}
 	batch.Commit()
+	tree.Commit()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -619,5 +633,6 @@ func BenchmarkTreeBatchSet(b *testing.B) {
 			fmt.Sprintf("value-%d", i),
 		)
 		batch.Commit()
+		tree.Commit()
 	}
 }

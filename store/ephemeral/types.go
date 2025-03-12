@@ -18,6 +18,10 @@ type (
 		GetSnapshotBatch(height int64) (EphemeralBatch, bool)
 
 		SetSnapshotPoolLimit(limit int64)
+
+		Commit()
+
+		SetHeight(height int64)
 	}
 
 	EphemeralReader interface {
@@ -83,7 +87,6 @@ type (
 		EphemeralReader
 		EphemeralWriter
 
-		// Used only in the top-level batch, it calls HeightMap.Set in (EphemeralWriter).Commit.
 		SetHeight(height int64)
 	}
 

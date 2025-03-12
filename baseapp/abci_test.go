@@ -238,7 +238,8 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 			Header: cmtproto.Header{Height: 1},
 		})
 
-		cacheCtx, writeCache := ctx.CacheContext()
+		// drop cacheCtx case
+		cacheCtx, _ := ctx.CacheContext()
 		{
 			ekv := cacheCtx.EphemeralBatch()
 			typedKV := ephemeral.
@@ -251,8 +252,6 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 			block2 := typedKV.Get([]byte("block-2"))
 			require.Equal(t, block2.Header.Height, int64(2))
 		}
-		// drop cacheCtx
-		var _ = writeCache
 
 		cacheCtx2, writeCache2 := ctx.CacheContext()
 		{
@@ -273,6 +272,8 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 		require.Equal(t, block1.Header.Height, int64(1))
 		block2 := typedKV.Get([]byte("block-2")) // from cacheCtx
 		require.Nil(t, block2)
+		block3 := typedKV.Get([]byte("block-3"))
+		require.Equal(t, block3.Header.Height, int64(3))
 
 		return sdk.EndBlock{}, nil
 	})
@@ -289,6 +290,8 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(3), app.LastBlockHeight())
 
+	// re-initialize after commit
+	ephemeral = cms.GetEphemeralBatch()
 	val = ephemeral.Get([]byte("block-1"))
 	require.NotNil(t, val)
 	require.Equal(t, val.(*cmtproto.Block).Header.Height, int64(1))

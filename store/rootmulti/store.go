@@ -77,10 +77,8 @@ type Store struct {
 	commitHeader        cmtproto.Header
 	commitSync          bool
 
-	ephemeralStore    ephemeral.EphemeralStore
-	ephemeralBatchMtx sync.RWMutex
-	ephemeralBatch    ephemeral.EphemeralBatch
-	warmupEphemeral   []func(func(types.StoreKey) types.KVStore, ephemeral.EphemeralBatch)
+	ephemeralStore  ephemeral.EphemeralStore
+	warmupEphemeral []func(func(types.StoreKey) types.KVStore, ephemeral.EphemeralBatch)
 }
 
 var (
@@ -95,7 +93,6 @@ var (
 // a store is created, KVStores must be mounted and finally LoadLatestVersion or
 // LoadVersion must be called.
 func NewStore(db dbm.DB, logger log.Logger, metricGatherer metrics.StoreMetrics) *Store {
-	ephmeralStore := ephemeral.NewTree()
 	return &Store{
 		db:                  db,
 		logger:              logger,
@@ -109,8 +106,7 @@ func NewStore(db dbm.DB, logger log.Logger, metricGatherer metrics.StoreMetrics)
 		pruningManager:      pruning.NewManager(db, logger),
 		metrics:             metricGatherer,
 
-		ephemeralStore: ephmeralStore,
-		ephemeralBatch: ephmeralStore.NewBatch(),
+		ephemeralStore: ephemeral.NewTree(),
 	}
 }
 
@@ -320,18 +316,15 @@ func (rs *Store) loadVersion(ver int64, upgrades *types.StoreUpgrades) error {
 	rs.stores = newStores
 
 	if rs.warmupEphemeral != nil {
-		rs.ephemeralBatch.SetHeight(ver)
+		rs.ephemeralStore.SetHeight(ver)
 
-		uncommittableBatch := &ephemeral.UncommittableBatch{EphemeralBatch: rs.ephemeralBatch}
+		batch := rs.ephemeralStore.NewBatch()
+		uncommittableBatch := &ephemeral.UncommittableBatch{EphemeralBatch: batch}
 		for _, f := range rs.warmupEphemeral {
 			f(rs.GetKVStore, uncommittableBatch)
 		}
-		rs.ephemeralBatch.Commit()
-
-		batch := rs.ephemeralStore.NewBatch()
-		rs.ephemeralBatchMtx.Lock()
-		rs.ephemeralBatch = batch
-		rs.ephemeralBatchMtx.Unlock()
+		batch.Commit()
+		rs.ephemeralStore.Commit()
 	}
 
 	// load any snapshot heights we missed from disk to be pruned on the next run
@@ -526,14 +519,7 @@ func (rs *Store) Commit() types.CommitID {
 	rs.lastCommitInfo = commitStores(version, rs.stores, rs.removalMap)
 	rs.lastCommitInfo.Timestamp = rs.commitHeader.Time
 	defer rs.flushMetadata(rs.db, version, rs.lastCommitInfo)
-	defer func() {
-		rs.ephemeralBatch.Commit()
-
-		newBatch := rs.ephemeralStore.NewBatch()
-		rs.ephemeralBatchMtx.Lock()
-		rs.ephemeralBatch = newBatch
-		rs.ephemeralBatchMtx.Unlock()
-	}()
+	defer rs.ephemeralStore.Commit()
 
 	// remove remnants of removed stores
 	for sk := range rs.removalMap {
@@ -615,17 +601,13 @@ func (rs *Store) CacheMultiStore() types.CacheMultiStore {
 		stores[k] = store
 	}
 
-	rs.ephemeralBatchMtx.RLock()
-	eb := rs.ephemeralBatch
-	rs.ephemeralBatchMtx.RUnlock()
-
 	return cachemulti.NewStore(
 		rs.db,
 		stores,
 		rs.keysByName,
 		rs.traceWriter,
 		rs.getTracingContext(),
-		eb,
+		rs.ephemeralStore.NewBatch(),
 	)
 }
 
@@ -746,7 +728,7 @@ func (rs *Store) GetKVStore(key types.StoreKey) types.KVStore {
 }
 
 func (rs *Store) GetEphemeralBatch() ephemeral.EphemeralBatch {
-	return rs.ephemeralBatch
+	return rs.ephemeralStore.NewBatch()
 }
 
 func (rs *Store) handlePruning(version int64) error {

@@ -16,7 +16,14 @@ type (
 		// root is an atomic pointer to the current root of the btree.
 		// When a batch is committed, it creates a new root node and atomically
 		// swaps it with the existing one.
-		root         *atomic.Pointer[btree]
+		root *atomic.Pointer[btree]
+		// The current B-tree is stored in the root atomic.Pointer when Tree.Commit() occurs.
+		// The reason for creating it temporarily in this way is that it should not be read
+		// in the FinalizeBlock state before BaseApp.Commit happens.
+		current *btree
+		base    *btree
+
+		height       int64
 		snapshotPool SnapshotPool
 	}
 
@@ -25,12 +32,12 @@ type (
 	IndexedBatch struct {
 		// parent is nil for top-level batches, non-nil for nested batches
 		parent *IndexedBatch
-		// tree is non-nil for top-level batches
-		tree *Tree
-		// base is a snapshot of the btree at the time the batch was created
-		base *btree
-		// current reflects changes made during batch operations
+
+		// current holds the current working copy of the btree for this top-level batch.
 		current *btree
+
+		// The tree exists to swap the pointer of Tree.current in the top-level batch.
+		tree *Tree
 
 		height int64
 	}
@@ -52,7 +59,9 @@ func NewTree() *Tree {
 	root.Store(tree)
 
 	return &Tree{
-		root: root,
+		root:    root,
+		current: tree.Copy(),
+		base:    tree,
 
 		snapshotPool: newSnapshotPool(),
 	}
@@ -88,9 +97,38 @@ func (t *Tree) NewBatch() EphemeralBatch {
 		// This is a top-level batch, so parent is nil
 		parent: nil,
 
-		tree:    t,
-		base:    base,
 		current: current,
+		tree:    t,
+	}
+}
+
+func (t *Tree) Commit() {
+	current := t.current
+
+	if current == nil {
+		panic("`EphemeralStore.Commit()` should not be called on an ephemeral store retrieved from the snapshot pool.")
+	}
+
+	copiedTree := current.Copy()
+	if !t.root.CompareAndSwap(t.base, current) {
+		panic("commit failed: concurrent modification detected")
+	}
+	t.current = copiedTree
+	t.base = current
+
+	if t.height != 0 {
+		snapshotTree := copiedTree.Copy()
+		root := &atomic.Pointer[btree]{}
+		root.Store(snapshotTree)
+
+		t.snapshotPool.Set(t.height, &Tree{
+			root:    root,
+			current: nil, // Trees stored in the snapshot pool cannot be committed
+
+			height:       0,
+			snapshotPool: nil,
+		})
+		t.height = 0
 	}
 }
 
@@ -155,17 +193,13 @@ func (b *IndexedBatch) NewNestedBatch() EphemeralBatch {
 	// Here, current refers to the current level's -1 level batch:
 	//   -> If current is L3: points to L2's current
 	//   -> If current is L2: points to L1's current
-	//   -> If current is L1: points to tree.root
+	//   -> If current is L1: points to tree.current
 	//
 	// newCurrent is a Copy()'d btree.
 	newCurrent := b.current.Copy()
 
 	return &IndexedBatch{
 		parent: b,
-
-		// base is nil for nested batches
-		base: nil,
-		tree: nil,
 
 		current: newCurrent,
 	}
@@ -176,41 +210,30 @@ func (b *IndexedBatch) NewNestedBatch() EphemeralBatch {
 // - For top-level batches, it replaces tree.root with the batch's current writer.
 func (b *IndexedBatch) Commit() {
 	if b.parent != nil {
-		// Nested batch: update parent's current pointer
+		// nested batch: update parent's current pointer
 		b.parent.current = b.current
-
-		// TODO(ephemeral): Should we panic if the L1 Batch is already committed?
-		// If we should, consider the following options:
-		//  1. Prevent committing if there are remaining references to L2 from the parent (L1) using reference counting.
-		//  2. Check the base pointer when committing from a child (L2 ~ ..).
-		//  3. Maintain the current behavior.
-		return
-	}
-
-	if b.base != nil {
-		// Top-level batch: replace tree's root using atomic CompareAndSwap
-		if !b.tree.root.CompareAndSwap(b.base, b.current) {
-			panic("commit failed: concurrent modification detected")
-		}
-
-		if b.height != 0 {
-			// Update the height map with the new store
-			copiedStore := b.current.Copy()
-			root := &atomic.Pointer[btree]{}
-			root.Store(copiedStore)
-
-			b.tree.snapshotPool.Set(b.height, &Tree{
-				root: root,
-				// snapshotPool is not used for snapshot batches
-				snapshotPool: nil,
-			})
+		if b.height != 0 { // If height is set in the batch, propagate it to the tree.
+			b.parent.height = b.height
 		}
 
 		return
 	}
 
-	// This case should never happen
-	panic("unreachable code, base is nil & parent is nil")
+	if b.current != nil {
+		// top-level batch: swap *Tree.current
+		b.tree.current = b.current
+		if b.height != 0 { // If height is set in the batch, propagate it to the tree.
+			b.tree.height = b.height
+		}
+
+		return
+	}
+
+	panic("unreachable code, parent is nil & current is nil")
+}
+
+func (t *Tree) SetHeight(height int64) {
+	t.height = height
 }
 
 // NOTE(ephemeral): lifecycle

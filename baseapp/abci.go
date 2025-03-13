@@ -703,7 +703,6 @@ func (app *BaseApp) VerifyVoteExtension(req *abci.RequestVerifyVoteExtension) (r
 func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
 	var events []abci.Event
 	var publishEvents sdk.PublishEvents
-	var trueOrder []EventType
 	var txEventSet []EventSet
 
 	if err := app.checkHalt(req.Height, req.Time); err != nil {
@@ -781,9 +780,7 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 		return nil, err
 	}
 
-	filtered, order := filterOutPublishEvents(preblockEvents)
-	events = append(events, filtered...)
-	trueOrder = append(trueOrder, order...)
+	events = append(events, preblockEvents...)
 
 	beginBlock, err := app.beginBlock(req)
 	if err != nil {
@@ -800,10 +797,7 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 	}
 
 	publishEvents = append(publishEvents, app.finalizeBlockState.Context().PublishEventManager().Events()...)
-	fmt.Println("len!!!!!", len(publishEvents))
-	filtered, order = filterOutPublishEvents(beginBlock.Events)
-	events = append(events, filtered...)
-	trueOrder = append(trueOrder, order...)
+	events = append(events, beginBlock.Events...)
 
 	// Reset the gas meter so that the AnteHandlers aren't required to
 	gasMeter = app.getBlockGasMeter(app.finalizeBlockState.Context())
@@ -873,14 +867,11 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 	}
 
 	publishEvents = append(publishEvents, app.finalizeBlockState.Context().PublishEventManager().Events()...)
-	fmt.Println("len!!!!!", len(publishEvents))
 
-	filtered, order = filterOutPublishEvents(endBlock.Events)
-	events = append(events, filtered...)
-	trueOrder = append(trueOrder, order...)
+	events = append(events, endBlock.Events...)
 	cp := app.GetConsensusParams(app.finalizeBlockState.Context())
 
-	fmt.Println(trueOrder)
+	events, trueOrder := filterOutPublishEvents(events)
 	app.flushData = PublishEventFlush{
 		Height:      header.Height,
 		PrevAppHash: header.AppHash,

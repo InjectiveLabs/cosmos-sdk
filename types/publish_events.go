@@ -29,7 +29,6 @@ func (em *PublishEventManager) EmitEvents(events PublishEvents) {
 }
 
 type PublishEvent interface {
-	ToString() string
 	Serialize() []byte
 }
 

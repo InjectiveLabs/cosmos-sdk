@@ -120,8 +120,8 @@ func TestPublishEvent_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 
 	pevts := <-publishEventChan
 	require.Len(t, pevts.PublishEvents, 2)
-	require.Equal(t, "sometype2", pevts.PublishEvents[0].ToString())
-	require.Equal(t, "anothertype2", pevts.PublishEvents[1].ToString())
+	require.Equal(t, StringPublishEvent{"sometype2"}, pevts.BlockEvents.PublishEvents[0])
+	require.Equal(t, StringPublishEvent{"anothertype2"}, pevts.BlockEvents.PublishEvents[1])
 
 	require.Len(t, pevts.AbciEvents, 2)
 

@@ -119,14 +119,14 @@ func TestPublishEvent_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	require.Equal(t, int64(1), app.LastBlockHeight())
 
 	pevts := <-publishEventChan
-	require.Len(t, pevts.PublishEvents, 2)
+	require.Len(t, pevts.BlockEvents.PublishEvents, 2)
 	require.Equal(t, StringPublishEvent{"sometype2"}, pevts.BlockEvents.PublishEvents[0])
 	require.Equal(t, StringPublishEvent{"anothertype2"}, pevts.BlockEvents.PublishEvents[1])
 
-	require.Len(t, pevts.AbciEvents, 2)
+	require.Len(t, pevts.BlockEvents.AbciEvents, 2)
 
-	require.Len(t, pevts.TrueOrder, 4)
-	require.Equal(t, pevts.TrueOrder, []string{
+	require.Len(t, pevts.BlockEvents.TrueOrder, 4)
+	require.Equal(t, pevts.BlockEvents.TrueOrder, []string{
 		"abci", "custom", "abci", "custom",
 	})
 
@@ -191,8 +191,12 @@ func TestPublishEvent_FinalizeBlock_DeliverTx(t *testing.T) {
 			require.Equal(t, pevts.PrevAppHash, lastAppHash, "should be the same as last app hash")
 		}
 		require.Equal(t, pevts.NewAppHash, res.AppHash)
-		require.Len(t, pevts.PublishEvents, 2*txPerHeight)
-		require.Len(t, pevts.TrueOrder, 5*txPerHeight)
+		require.Len(t, pevts.TxEvents, txPerHeight)
+		fmt.Println(pevts.TxEvents)
+		for i := 0; i < txPerHeight; i++ {
+			require.Len(t, pevts.TxEvents[i].PublishEvents, 2)
+			require.Len(t, pevts.TxEvents[i].TrueOrder, 5)
+		}
 
 		lastAppHash = res.AppHash
 	}

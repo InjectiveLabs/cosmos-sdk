@@ -702,7 +702,9 @@ func (app *BaseApp) VerifyVoteExtension(req *abci.RequestVerifyVoteExtension) (r
 // must be used.
 func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
 	var events []abci.Event
+	var publishEvents sdk.PublishEvents
 	var trueOrder []string
+	var txEventSet []EventSet
 
 	if err := app.checkHalt(req.Height, req.Time); err != nil {
 		return nil, err
@@ -797,6 +799,8 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 		// continue
 	}
 
+	publishEvents = append(publishEvents, app.finalizeBlockState.Context().PublishEventManager().Events()...)
+	fmt.Println("len!!!!!", len(publishEvents))
 	filtered, order = filterOutPublishEvents(beginBlock.Events)
 	events = append(events, filtered...)
 	trueOrder = append(trueOrder, order...)
@@ -813,6 +817,8 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 	txResults := make([]*abci.ExecTxResult, 0, len(req.Txs))
 	for _, rawTx := range req.Txs {
 		var response *abci.ExecTxResult
+
+		app.finalizeBlockState.SetContext(app.finalizeBlockState.Context().WithPublishEventManager(sdk.NewPublishEventManager()))
 
 		if _, err := app.txDecoder(rawTx); err == nil {
 			response = app.deliverTx(rawTx)
@@ -839,13 +845,19 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 
 		filtered, order := filterOutPublishEvents(response.Events)
 		response.Events = filtered
-		trueOrder = append(trueOrder, order...)
 		txResults = append(txResults, response)
+		txEventSet = append(txEventSet, EventSet{
+			AbciEvents:    response.Events,
+			PublishEvents: app.finalizeBlockState.Context().PublishEventManager().Events(),
+			TrueOrder:     order,
+		})
 	}
 
 	if app.finalizeBlockState.ms.TracingEnabled() {
 		app.finalizeBlockState.ms = app.finalizeBlockState.ms.SetTracingContext(nil).(storetypes.CacheMultiStore)
 	}
+
+	app.finalizeBlockState.SetContext(app.finalizeBlockState.Context().WithPublishEventManager(sdk.NewPublishEventManager()))
 
 	endBlock, err := app.endBlock(app.finalizeBlockState.Context())
 	if err != nil {
@@ -860,6 +872,9 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 		// continue
 	}
 
+	publishEvents = append(publishEvents, app.finalizeBlockState.Context().PublishEventManager().Events()...)
+	fmt.Println("len!!!!!", len(publishEvents))
+
 	filtered, order = filterOutPublishEvents(endBlock.Events)
 	events = append(events, filtered...)
 	trueOrder = append(trueOrder, order...)
@@ -867,11 +882,14 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 
 	fmt.Println(trueOrder)
 	app.flushData = PublishEventFlush{
-		Height:        header.Height,
-		PrevAppHash:   header.AppHash,
-		AbciEvents:    events,
-		PublishEvents: app.finalizeBlockState.Context().PublishEventManager().Events(),
-		TrueOrder:     trueOrder,
+		Height:      header.Height,
+		PrevAppHash: header.AppHash,
+		BlockEvents: EventSet{
+			AbciEvents:    events,
+			PublishEvents: publishEvents,
+			TrueOrder:     trueOrder,
+		},
+		TxEvents: txEventSet,
 	}
 
 	fmt.Println("events in finalize block", events)

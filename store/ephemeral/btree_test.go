@@ -190,7 +190,7 @@ func TestConcurrentBatchCreationWithCommits(t *testing.T) {
 			default:
 				// Create and commit a batch
 				batch := tree.NewBatch()
-				key := fmt.Sprintf("commit-%d", commitCount)
+				key := fmt.Sprintf("commit-%05d", commitCount)
 				batch.Set([]byte(key), fmt.Sprintf("committed-value-%d", commitCount))
 
 				// Small random delay to increase chance of race conditions
@@ -282,7 +282,7 @@ func TestConcurrentBatchCreationWithCommits(t *testing.T) {
 
 	// At least some committed values should be present
 	start := []byte("commit-")
-	end := []byte("commit-" + fmt.Sprintf("%d", numCommits))
+	end := []byte("commit-" + fmt.Sprintf("%05d", numCommits))
 	iter := lastBatch.Iterator(start, end)
 	defer iter.Close()
 
@@ -482,9 +482,15 @@ func TestBatchIteratorIsolation(t *testing.T) {
 		iteratorPairs2[string(iter2.Key())] = iter2.Value()
 	}
 
-	require.NotContains(t, iteratorPairs2, "new-key", "New iterator should still not see changes from batch1")
-	require.Equal(t, "init-value-5", iteratorPairs2["init-key-5"], "New iterator should see original values")
-	require.Contains(t, iteratorPairs2, "init-key-3", "New iterator should still see deleted key")
+	require.Equal(t, iteratorPairs, iteratorPairs2, "Iterator should maintain its view even after batch1 commit")
+
+	// check isolation
+	iterFromBatch1 := batch1.Iterator(nil, nil)
+	iteratorPairsFromBatch1 := make(map[string]any)
+	for ; iterFromBatch1.Valid(); iterFromBatch1.Next() {
+		iteratorPairsFromBatch1[string(iterFromBatch1.Key())] = iterFromBatch1.Value()
+	}
+	require.NotEqual(t, iteratorPairs, iteratorPairsFromBatch1, "Iterator from batch1 should see its own changes")
 }
 
 // TestSnapshotPool verifies the functionality of height maps and snapshot retrieval.

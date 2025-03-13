@@ -20,8 +20,13 @@ type (
 		// The current B-tree is stored in the root atomic.Pointer when Tree.Commit() occurs.
 		// The reason for creating it temporarily in this way is that it should not be read
 		// in the FinalizeBlock state before BaseApp.Commit happens.
+		//
+		// `current` is implemented with the assumption that it is accessed only by a single writer.
 		current *btree
-		base    *btree
+		// base ensures that only one IndexedBatch (L1) can be committed.
+		//
+		// It is set to nil for Trees retrieved from the snapshotPool.
+		base *atomic.Pointer[btree]
 
 		height       int64
 		snapshotPool SnapshotPool
@@ -35,6 +40,11 @@ type (
 
 		// current holds the current working copy of the btree for this top-level batch.
 		current *btree
+
+		// base points to Tree.base when the batch is created.
+		//
+		// If Tree.base differs from base at commit time, the commit fails and a panic occurs.
+		base *btree
 
 		// The tree exists to swap the pointer of Tree.current in the top-level batch.
 		tree *Tree
@@ -58,10 +68,13 @@ func NewTree() *Tree {
 	root := &atomic.Pointer[btree]{}
 	root.Store(tree)
 
+	base := &atomic.Pointer[btree]{}
+	base.Store(tree)
+
 	return &Tree{
 		root:    root,
 		current: tree.Copy(),
-		base:    tree,
+		base:    base,
 
 		snapshotPool: newSnapshotPool(),
 	}
@@ -88,21 +101,27 @@ func (t *Tree) GetSnapshotBatch(height int64) (EphemeralBatch, bool) {
 // NewBatch creates a top-level batch.
 // It creates a copy-on-write snapshot of the tree's root btree as its working copy.
 func (t *Tree) NewBatch() EphemeralBatch {
-	base := t.root.Load()
-
+	root := t.root.Load()
 	// Create a copy-on-write snapshot for the current
-	current := base.Copy()
+	current := root.Copy()
+
+	var base *btree
+	if t.base != nil {
+		base = t.base.Load()
+	}
 
 	return &IndexedBatch{
 		// This is a top-level batch, so parent is nil
 		parent: nil,
 
 		current: current,
+		base:    base,
 		tree:    t,
 	}
 }
 
 func (t *Tree) Commit() {
+	// Since `current` is used only in a single thread, direct access is safe.
 	current := t.current
 
 	if current == nil {
@@ -110,20 +129,22 @@ func (t *Tree) Commit() {
 	}
 
 	copiedTree := current.Copy()
-	if !t.root.CompareAndSwap(t.base, current) {
+	if !t.root.CompareAndSwap(t.base.Load(), current) {
 		panic("commit failed: concurrent modification detected")
 	}
 	t.current = copiedTree
-	t.base = current
+	t.base.Store(current)
 
 	if t.height != 0 {
 		snapshotTree := copiedTree.Copy()
+
 		root := &atomic.Pointer[btree]{}
 		root.Store(snapshotTree)
 
 		t.snapshotPool.Set(t.height, &Tree{
 			root:    root,
 			current: nil, // Trees stored in the snapshot pool cannot be committed
+			base:    nil,
 
 			height:       0,
 			snapshotPool: nil,
@@ -221,6 +242,10 @@ func (b *IndexedBatch) Commit() {
 
 	if b.current != nil {
 		// top-level batch: swap *Tree.current
+		if b.tree.base.Load() != b.base {
+			panic("commit failed: concurrent modification detected")
+		}
+
 		b.tree.current = b.current
 		if b.height != 0 { // If height is set in the batch, propagate it to the tree.
 			b.tree.height = b.height

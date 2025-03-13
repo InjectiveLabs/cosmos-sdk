@@ -610,6 +610,54 @@ func TestNestedSnapshotBatches(t *testing.T) {
 	require.Equal(t, "L3-value", val, "Original snapshot should be unchanged")
 }
 
+// TestSimpleConcurrentL1BatchCommitPanic demonstrates a simpler case where
+// two L1 batches created from the same base attempt to commit sequentially,
+// causing a panic in the second commit.
+func TestSimpleConcurrentL1BatchCommitPanic(t *testing.T) {
+	// Create tree
+	tree := NewTree()
+
+	// Add initial data
+	initialBatch := tree.NewBatch()
+	initialBatch.Set([]byte("initial-key"), "initial-value")
+	initialBatch.Commit()
+	tree.Commit()
+
+	// Create two L1 batches from the same base state
+	batch1 := tree.NewBatch()
+	batch2 := tree.NewBatch()
+
+	// Both batches make different changes
+	batch1.Set([]byte("key-1"), "value-1")
+	batch2.Set([]byte("key-2"), "value-2")
+
+	// First batch commits successfully
+	batch1.Commit()
+	tree.Commit()
+
+	// Verify first batch's changes are in the tree
+	val := tree.get("key-1")
+	require.Equal(t, "value-1", val, "First batch value should be in tree")
+
+	// Second batch should panic when committed since base has changed
+	defer func() {
+		r := recover()
+		require.NotNil(t, r, "Second batch commit should panic")
+
+		panicMsg, ok := r.(string)
+		require.True(t, ok, "Panic should return a string message")
+		require.True(t, strings.Contains(panicMsg, "commit failed: concurrent modification"),
+			"Unexpected panic message: %s", panicMsg)
+	}()
+
+	// This should cause a panic
+	batch2.Commit()
+	tree.Commit()
+
+	// This line should not be reached due to panic
+	t.Fatal("Expected panic did not occur")
+}
+
 // cpu: Apple M2 Pro
 // BenchmarkTreeBatchSet-12    	  244624	      5341 ns/op	   12467 B/op	      34 allocs/op
 func BenchmarkTreeBatchSet(b *testing.B) {

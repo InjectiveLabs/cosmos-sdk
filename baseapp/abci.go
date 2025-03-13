@@ -703,7 +703,7 @@ func (app *BaseApp) VerifyVoteExtension(req *abci.RequestVerifyVoteExtension) (r
 func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
 	var events []abci.Event
 	var publishEvents sdk.PublishEvents
-	var trueOrder []string
+	var trueOrder []EventType
 	var txEventSet []EventSet
 
 	if err := app.checkHalt(req.Height, req.Time); err != nil {
@@ -902,17 +902,17 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Request
 	}, nil
 }
 
-func filterOutPublishEvents(events []abci.Event) ([]abci.Event, []string) {
+func filterOutPublishEvents(events []abci.Event) ([]abci.Event, []EventType) {
 	var filteredEvents []abci.Event
-	var trueOrder []string
+	var trueOrder []EventType
 
 	for _, e := range events {
 		if e.Type == sdk.PlaceholderEventType {
-			trueOrder = append(trueOrder, "custom")
+			trueOrder = append(trueOrder, EventTypePublish)
 			continue
 		}
 		filteredEvents = append(filteredEvents, e)
-		trueOrder = append(trueOrder, "abci")
+		trueOrder = append(trueOrder, EventTypeAbci)
 	}
 
 	return filteredEvents, trueOrder

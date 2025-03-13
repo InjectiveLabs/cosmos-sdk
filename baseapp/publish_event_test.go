@@ -126,8 +126,8 @@ func TestPublishEvent_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	require.Len(t, pevts.BlockEvents.AbciEvents, 2)
 
 	require.Len(t, pevts.BlockEvents.TrueOrder, 4)
-	require.Equal(t, pevts.BlockEvents.TrueOrder, []string{
-		"abci", "custom", "abci", "custom",
+	require.Equal(t, pevts.BlockEvents.TrueOrder, []baseapp.EventType{
+		baseapp.EventTypeAbci, baseapp.EventTypePublish, baseapp.EventTypeAbci, baseapp.EventTypePublish,
 	})
 
 }

@@ -5,10 +5,17 @@ import (
 	types "github.com/cosmos/cosmos-sdk/types"
 )
 
+type EventType byte
+
+const (
+	EventTypeAbci EventType = iota
+	EventTypePublish
+)
+
 type EventSet struct {
 	AbciEvents    []abci.Event
 	PublishEvents types.PublishEvents
-	TrueOrder     []string
+	TrueOrder     []EventType
 }
 
 type PublishEventFlush struct {

@@ -907,7 +907,7 @@ func filterOutPublishEvents(events []abci.Event) ([]abci.Event, []string) {
 	var trueOrder []string
 
 	for _, e := range events {
-		if e.Type == "publish event placeholder" {
+		if e.Type == sdk.PlaceholderEventType {
 			trueOrder = append(trueOrder, "custom")
 			continue
 		}

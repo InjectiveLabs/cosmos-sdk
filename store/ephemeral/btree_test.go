@@ -96,9 +96,9 @@ func TestWriterReaderInconsistency(t *testing.T) {
 	require.Equal(t, "new-value", val, "New key should be present")
 }
 
-// TestConcurrencyL1Batch tests creation of multiple L1 batches concurrently.
+// TestConcurrencyL1BatchCreation tests creation of multiple L1 batches concurrently.
 // It ensures each batch maintains its own isolated view of the tree.
-func TestConcurrencyL1Batch(t *testing.T) {
+func TestConcurrencyL1BatchCreation(t *testing.T) {
 	// Create tree
 	tree := NewTree()
 

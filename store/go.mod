@@ -77,6 +77,6 @@ require (
 
 replace (
 	// Use CometBFT v1.0.1 with Mempool lanes and DOG
-	github.com/cometbft/cometbft => github.com/injectivelabs/cometbft v1.0.2-0.20250315062455-e9e4c8a0ecb9
+	github.com/cometbft/cometbft => github.com/InjectiveLabs/cometbft v1.0.1-inj
 	github.com/cometbft/cometbft/api => github.com/injectivelabs/cometbft/api v1.0.1-0.20250315062455-e9e4c8a0ecb9
 )

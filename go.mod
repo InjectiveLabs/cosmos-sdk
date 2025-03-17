@@ -195,7 +195,7 @@ replace cosmossdk.io/api => ./api
 
 // Below are the long-lived replace of the Cosmos SDK
 replace (
-	// Import the store module from the v0.50.x-inj-comet-v1 branch
+	// Import the store module from the v0.50.x-store-comet1-inj branch
 	cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v1.1.1-0.20250317140226-272ef0ccbb2e
 	cosmossdk.io/x/evidence => ./x/evidence
 	cosmossdk.io/x/feegrant => ./x/feegrant

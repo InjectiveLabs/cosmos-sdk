@@ -185,4 +185,5 @@ require (
 // Use local Cosmos SDK to use ABCI message types in CometBFT v1.
 replace github.com/cosmos/cosmos-sdk => ../../.
 
-replace cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v1.1.1-0.20250303163942-1853f781be39
+// Import the store module from the v0.50.x-inj-comet-v1 branch
+replace cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v1.1.1-0.20250317140226-272ef0ccbb2e

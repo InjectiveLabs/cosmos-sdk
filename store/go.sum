@@ -133,10 +133,10 @@ github.com/hashicorp/yamux v0.1.1 h1:yrQxtgseBDrq9Y652vSRDvsKCJKOUD+GzTS4Y0Y8pvE
 github.com/hashicorp/yamux v0.1.1/go.mod h1:CtWFDAQgb7dxtzFs4tWbplKIe2jSi3+5vKbgIO0SLnQ=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
-github.com/injectivelabs/cometbft v1.0.2-0.20250306060709-658f4c10ac52 h1:Cq0FXghrX7s8UTFyB6gH+SdNPiGwS+9+TustZ4OKhUw=
-github.com/injectivelabs/cometbft v1.0.2-0.20250306060709-658f4c10ac52/go.mod h1:RgHHndb7wdtm9etmVj4tDn1NynC9YKIEJW9UUI3FCn4=
-github.com/injectivelabs/cometbft/api v1.0.1-0.20250306060709-658f4c10ac52 h1:l44Mrd6kVwMVdNtaub0tX9tV6tNTjljoPbXYoxXihqk=
-github.com/injectivelabs/cometbft/api v1.0.1-0.20250306060709-658f4c10ac52/go.mod h1:Ivh6nSCTJPQOyfQo8dgnyu/T88it092sEqSrZSmTQN8=
+github.com/injectivelabs/cometbft v1.0.2-0.20250315062455-e9e4c8a0ecb9 h1:dv7XInpkZdVnj8ogSzYHNdqlkAseuyTN/mP6FIXmMm0=
+github.com/injectivelabs/cometbft v1.0.2-0.20250315062455-e9e4c8a0ecb9/go.mod h1:RgHHndb7wdtm9etmVj4tDn1NynC9YKIEJW9UUI3FCn4=
+github.com/injectivelabs/cometbft/api v1.0.1-0.20250315062455-e9e4c8a0ecb9 h1:CF4i7hDq39uQaRDBChTiYfGSFGz3KxH5EhJbG9zsOOI=
+github.com/injectivelabs/cometbft/api v1.0.1-0.20250315062455-e9e4c8a0ecb9/go.mod h1:Ivh6nSCTJPQOyfQo8dgnyu/T88it092sEqSrZSmTQN8=
 github.com/jhump/protoreflect v1.15.3 h1:6SFRuqU45u9hIZPJAoZ8c28T3nK64BNdp9w6jFonzls=
 github.com/jhump/protoreflect v1.15.3/go.mod h1:4ORHmSBmlCW8fh3xHmJMGyul1zNqZK4Elxc8qKP+p1k=
 github.com/json-iterator/go v1.1.6/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=

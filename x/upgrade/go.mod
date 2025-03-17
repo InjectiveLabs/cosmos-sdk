@@ -225,10 +225,11 @@ replace (
 	cosmossdk.io/x/staking => ../staking
 )
 
-// Use store v1.1.0 bumped to CometBFT v1
-replace cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v1.1.1-0.20250303163942-1853f781be39
+// Import the store module from the v0.50.x-inj-comet-v1 branch
+replace cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v1.1.1-0.20250317140226-272ef0ccbb2e
 
 replace (
-	github.com/cometbft/cometbft => github.com/injectivelabs/cometbft v1.0.2-0.20250306060709-658f4c10ac52
-	github.com/cometbft/cometbft/api => github.com/injectivelabs/cometbft/api v1.0.1-0.20250306060709-658f4c10ac52
+	// Use CometBFT v1.0.1 with Mempool lanes and DOG
+	github.com/cometbft/cometbft => github.com/injectivelabs/cometbft v1.0.2-0.20250315062455-e9e4c8a0ecb9
+	github.com/cometbft/cometbft/api => github.com/injectivelabs/cometbft/api v1.0.1-0.20250315062455-e9e4c8a0ecb9
 )

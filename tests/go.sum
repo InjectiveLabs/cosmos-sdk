@@ -725,10 +725,10 @@ github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANyt
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d/go.mod h1:qj24IKcXYK6Iy9ceXlo3Tc+vtHo9lIhSX5JddghvEPo=
-github.com/injectivelabs/cometbft v1.0.2-0.20250306060709-658f4c10ac52 h1:Cq0FXghrX7s8UTFyB6gH+SdNPiGwS+9+TustZ4OKhUw=
-github.com/injectivelabs/cometbft v1.0.2-0.20250306060709-658f4c10ac52/go.mod h1:RgHHndb7wdtm9etmVj4tDn1NynC9YKIEJW9UUI3FCn4=
-github.com/injectivelabs/cometbft/api v1.0.1-0.20250306060709-658f4c10ac52 h1:l44Mrd6kVwMVdNtaub0tX9tV6tNTjljoPbXYoxXihqk=
-github.com/injectivelabs/cometbft/api v1.0.1-0.20250306060709-658f4c10ac52/go.mod h1:Ivh6nSCTJPQOyfQo8dgnyu/T88it092sEqSrZSmTQN8=
+github.com/injectivelabs/cometbft v1.0.2-0.20250315062455-e9e4c8a0ecb9 h1:dv7XInpkZdVnj8ogSzYHNdqlkAseuyTN/mP6FIXmMm0=
+github.com/injectivelabs/cometbft v1.0.2-0.20250315062455-e9e4c8a0ecb9/go.mod h1:RgHHndb7wdtm9etmVj4tDn1NynC9YKIEJW9UUI3FCn4=
+github.com/injectivelabs/cometbft/api v1.0.1-0.20250315062455-e9e4c8a0ecb9 h1:CF4i7hDq39uQaRDBChTiYfGSFGz3KxH5EhJbG9zsOOI=
+github.com/injectivelabs/cometbft/api v1.0.1-0.20250315062455-e9e4c8a0ecb9/go.mod h1:Ivh6nSCTJPQOyfQo8dgnyu/T88it092sEqSrZSmTQN8=
 github.com/jhump/protoreflect v1.15.3 h1:6SFRuqU45u9hIZPJAoZ8c28T3nK64BNdp9w6jFonzls=
 github.com/jhump/protoreflect v1.15.3/go.mod h1:4ORHmSBmlCW8fh3xHmJMGyul1zNqZK4Elxc8qKP+p1k=
 github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af/go.mod h1:Nht3zPeWKUH0NzdCt2Blrr5ys8VGpn0CEB0cQHVjt7k=

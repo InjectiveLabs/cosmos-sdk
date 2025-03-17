@@ -550,6 +550,7 @@ func TestSnapshotPool(t *testing.T) {
 	batch1.SetHeight(finalHeight)
 	batch1.Set([]byte("multi-key-1"), "first-batch")
 	batch1.Commit()
+	tree.Commit()
 
 	// Second batch at height 100 (should overwrite the snapshot)
 	batch2 := tree.NewBatch()

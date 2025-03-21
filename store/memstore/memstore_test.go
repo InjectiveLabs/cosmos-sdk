@@ -1,4 +1,4 @@
-package ephemeral
+package memstore
 
 import (
 	"fmt"
@@ -9,11 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"cosmossdk.io/store/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func (t *Tree) get(key string) any {
+func (t *memStoreManager) get(key string) any {
 	return t.root.Load().Get([]byte(key))
 }
 
@@ -21,18 +22,18 @@ func (t *Tree) get(key string) any {
 // It ensures that changes propagate correctly from L2 to L1 to tree root.
 func TestTreeBatchNestedBatch(t *testing.T) {
 	// 1. Create tree and verify initial state
-	tree := NewTree()
+	tree := NewMemStoreManager()
 	val := tree.get("a")
 	require.Nil(t, val, "tree should not have key 'a' before any batch")
 
 	// 2. Create L1 (top-level) batch and set key "a"
-	batchL1 := tree.NewBatch()
+	batchL1 := tree.Branch()
 	batchL1.Set([]byte("a"), "alpha")
 	val = batchL1.Get([]byte("a"))
 	require.Equal(t, "alpha", val, "L1 key 'a' should be 'alpha'")
 
 	{ // 3. Create L2 (nested) batch from L1, set key "b", and delete key "a"
-		batchL2 := batchL1.NewNestedBatch()
+		batchL2 := batchL1.Branch()
 		batchL2.Set([]byte("b"), "beta")
 		batchL2.Delete([]byte("a"))
 		// Commit L2: L1's current pointer should be updated
@@ -48,7 +49,7 @@ func TestTreeBatchNestedBatch(t *testing.T) {
 	// 4. Commit L1: Tree's root pointer should change
 	originalRoot := tree.root.Load()
 	batchL1.Commit()
-	tree.Commit()
+	tree.Commit(1)
 	newRoot := tree.root.Load()
 	require.NotEqual(t, originalRoot, newRoot, "tree's root pointer should change after L1 commit")
 
@@ -63,16 +64,16 @@ func TestTreeBatchNestedBatch(t *testing.T) {
 // when creating an L1 batch.
 func TestWriterReaderInconsistency(t *testing.T) {
 	// Create tree
-	tree := NewTree()
+	tree := NewMemStoreManager()
 
 	// Add initial data
-	batchInitial := tree.NewBatch()
+	batchInitial := tree.Branch()
 	batchInitial.Set([]byte("key"), "initial-value")
 	batchInitial.Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	// Create new batch - at this point reader has data but writer is empty
-	batchL1 := tree.NewBatch()
+	batchL1 := tree.Branch()
 
 	// This value should be read from reader - "initial-value" should exist
 	val := batchL1.Get([]byte("key"))
@@ -86,10 +87,10 @@ func TestWriterReaderInconsistency(t *testing.T) {
 
 	// Commit changes
 	batchL1.Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	// Verify final state
-	batchCheck := tree.NewBatch()
+	batchCheck := tree.Branch()
 	val = batchCheck.Get([]byte("key"))
 	require.Nil(t, val, "Key should be deleted")
 	val = batchCheck.Get([]byte("key2"))
@@ -100,21 +101,21 @@ func TestWriterReaderInconsistency(t *testing.T) {
 // It ensures each batch maintains its own isolated view of the tree.
 func TestConcurrencyL1BatchCreation(t *testing.T) {
 	// Create tree
-	tree := NewTree()
+	tree := NewMemStoreManager()
 
 	// Verify initial state
 	require.Nil(t, tree.get("key"), "Tree should be empty initially")
 
 	// Create multiple L1 batches
 	const numBatches = 10_000
-	batches := make([]EphemeralBatch, numBatches)
+	batches := make([]types.MemStore, numBatches)
 
 	// Set the same key with different values in each batch
 	wg := &sync.WaitGroup{}
 	for i := 0; i < numBatches; i++ {
 		wg.Add(1)
 		go func(i int) {
-			batches[i] = tree.NewBatch()
+			batches[i] = tree.Branch()
 			batches[i].Set([]byte("key"), fmt.Sprintf("value-%d", i))
 			wg.Done()
 		}(i)
@@ -130,7 +131,7 @@ func TestConcurrencyL1BatchCreation(t *testing.T) {
 	// Commit only one batch (index 2)
 	selectedIndex := 2
 	batches[selectedIndex].Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	// Don't commit other batches
 	_ = batches
@@ -145,16 +146,16 @@ func TestConcurrencyL1BatchCreation(t *testing.T) {
 // during continuous commits from another goroutine.
 // This simulates heavy concurrency with one thread committing and many creating batches.
 func TestConcurrentBatchCreationWithCommits(t *testing.T) {
-	tree := NewTree()
+	tree := NewMemStoreManager()
 
 	// Initialize tree with some data
-	initialBatch := tree.NewBatch()
+	initialBatch := tree.Branch()
 	for i := 0; i < 10; i++ {
 		key := fmt.Sprintf("init-key-%d", i)
 		initialBatch.Set([]byte(key), fmt.Sprintf("init-value-%d", i))
 	}
 	initialBatch.Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	// Number of worker goroutines creating batches
 	const numWorkers = 50
@@ -182,14 +183,14 @@ func TestConcurrentBatchCreationWithCommits(t *testing.T) {
 	go func() {
 		<-startWorkers // Wait for workers to start
 
-		commitCount := 0
+		commitCount := int64(1)
 		for {
 			select {
 			case <-stopCommitter:
 				return
 			default:
 				// Create and commit a batch
-				batch := tree.NewBatch()
+				batch := tree.Branch()
 				key := fmt.Sprintf("commit-%05d", commitCount)
 				batch.Set([]byte(key), fmt.Sprintf("committed-value-%d", commitCount))
 
@@ -198,7 +199,7 @@ func TestConcurrentBatchCreationWithCommits(t *testing.T) {
 
 				// Commit the batch
 				batch.Commit()
-				tree.Commit()
+				tree.Commit(commitCount)
 				commitCount++
 
 				if commitCount >= numCommits {
@@ -218,7 +219,7 @@ func TestConcurrentBatchCreationWithCommits(t *testing.T) {
 				time.Sleep(time.Millisecond * time.Duration(rand.Intn(3)))
 
 				// Create a batch
-				batch := tree.NewBatch()
+				batch := tree.Branch()
 
 				// Ensure the batch is valid
 				assert.NotNil(t, batch, fmt.Errorf("worker %d: nil batch created", workerID))
@@ -271,7 +272,7 @@ func TestConcurrentBatchCreationWithCommits(t *testing.T) {
 	close(stopCommitter)
 
 	// Verify final tree state contains some committed values
-	lastBatch := tree.NewBatch()
+	lastBatch := tree.Branch()
 
 	// Initial values should still be present
 	for i := 0; i < 10; i++ {
@@ -301,10 +302,10 @@ func TestConcurrentBatchCreationWithCommits(t *testing.T) {
 // are not propagated to its parent L1 batch.
 func TestUncommittedL2BatchChanges(t *testing.T) {
 	// Create tree
-	tree := NewTree()
+	tree := NewMemStoreManager()
 
 	// Create L1 batch and set initial data
-	batchL1 := tree.NewBatch()
+	batchL1 := tree.Branch()
 	batchL1.Set([]byte("key1"), "original-value")
 
 	// Verify initial L1 state
@@ -314,7 +315,7 @@ func TestUncommittedL2BatchChanges(t *testing.T) {
 	// Create L2 batch (limited scope with curly braces)
 	{
 		// Create L2 batch
-		batchL2 := batchL1.NewNestedBatch()
+		batchL2 := batchL1.Branch()
 
 		// Modify existing key in L2
 		batchL2.Set([]byte("key1"), "modified-value")
@@ -342,7 +343,7 @@ func TestUncommittedL2BatchChanges(t *testing.T) {
 
 	// Commit L1 batch
 	batchL1.Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	// Verify tree state - only L1's changes should be applied, not L2's
 	val = tree.get("key1")
@@ -356,21 +357,21 @@ func TestUncommittedL2BatchChanges(t *testing.T) {
 // are not propagated to the tree root.
 func TestUncommittedL1BatchChanges(t *testing.T) {
 	// Create tree
-	tree := NewTree()
+	tree := NewMemStoreManager()
 
 	// Add initial data (for comparison)
-	initialBatch := tree.NewBatch()
+	initialBatch := tree.Branch()
 	initialBatch.Set([]byte("initial-key"), "initial-value")
 	initialBatch.Set([]byte("to-delete"), "temp-value") // Add key to be deleted later
 	initialBatch.Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	// Verify initial tree state
 	val := tree.get("initial-key")
 	require.Equal(t, "initial-value", val, "Tree should have initial value")
 
 	{ // Create L1 batch and set data (limited scope)
-		batchL1 := tree.NewBatch()
+		batchL1 := tree.Branch()
 
 		// Modify existing key
 		batchL1.Set([]byte("initial-key"), "modified-value")
@@ -406,7 +407,7 @@ func TestUncommittedL1BatchChanges(t *testing.T) {
 	require.Equal(t, "temp-value", val, "Tree should still have key that was deleted in uncommitted batch")
 
 	// Verify tree state with a new batch
-	checkBatch := tree.NewBatch()
+	checkBatch := tree.Branch()
 	val = checkBatch.Get([]byte("initial-key"))
 	require.Equal(t, "initial-value", val, "New batch should see initial value in tree")
 
@@ -419,8 +420,8 @@ func TestUncommittedL1BatchChanges(t *testing.T) {
 // It demonstrates the point-in-time view property of iterators.
 func TestBatchIteratorIsolation(t *testing.T) {
 	// Create tree with initial data
-	tree := NewTree()
-	setupBatch := tree.NewBatch()
+	tree := NewMemStoreManager()
+	setupBatch := tree.Branch()
 
 	// Add initial data to tree
 	for i := 0; i < 10; i++ {
@@ -429,11 +430,11 @@ func TestBatchIteratorIsolation(t *testing.T) {
 		setupBatch.Set(key, value)
 	}
 	setupBatch.Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	// Create two L1 batches concurrently - both have same initial view
-	batch1 := tree.NewBatch()
-	batch2 := tree.NewBatch()
+	batch1 := tree.Branch()
+	batch2 := tree.Branch()
 
 	// Verify both batches see the same initial state
 	val1 := batch1.Get([]byte("init-key-5"))
@@ -466,12 +467,12 @@ func TestBatchIteratorIsolation(t *testing.T) {
 
 	// Commit batch1
 	batch1.Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	// Verify changes are in the tree
-	require.Equal(t, "new-value", tree.NewBatch().Get([]byte("new-key")), "Tree should have new key after batch1 commit")
-	require.Equal(t, "modified-in-batch1", tree.NewBatch().Get([]byte("init-key-5")), "Tree should have modified value")
-	require.Nil(t, tree.NewBatch().Get([]byte("init-key-3")), "Tree should not have deleted key")
+	require.Equal(t, "new-value", tree.Branch().Get([]byte("new-key")), "Tree should have new key after batch1 commit")
+	require.Equal(t, "modified-in-batch1", tree.Branch().Get([]byte("init-key-5")), "Tree should have modified value")
+	require.Nil(t, tree.Branch().Get([]byte("init-key-3")), "Tree should not have deleted key")
 
 	// Create a new iterator on batch2 and verify it still doesn't see changes
 	// (batch2 maintains its point-in-time view even after batch1 is committed)
@@ -497,7 +498,7 @@ func TestBatchIteratorIsolation(t *testing.T) {
 // It ensures that batches can be created with specific heights and later retrieved correctly.
 func TestSnapshotPool(t *testing.T) {
 	// Create tree
-	tree := NewTree()
+	tree := NewMemStoreManager()
 	tree.SetSnapshotPoolLimit(10)
 
 	// Add data at different heights
@@ -506,8 +507,7 @@ func TestSnapshotPool(t *testing.T) {
 
 	for _, height := range heights {
 		// Create batch with height
-		batch := tree.NewBatch()
-		batch.SetHeight(height)
+		batch := tree.Branch()
 
 		// Set height-specific value
 		key := []byte("key")
@@ -519,12 +519,12 @@ func TestSnapshotPool(t *testing.T) {
 
 		// Commit batch
 		batch.Commit()
-		tree.Commit()
+		tree.Commit(height)
 	}
 
 	// Get snapshots at each height and verify values
 	for _, height := range heights {
-		snapshotBatch, found := tree.GetSnapshotBatch(height)
+		snapshotBatch, found := tree.GetSnapshotBranch(height)
 		require.True(t, found, "Should find snapshot for height %d", height)
 
 		// Check correct value at this height
@@ -538,7 +538,7 @@ func TestSnapshotPool(t *testing.T) {
 	}
 
 	// Verify requesting non-existent height returns false
-	_, found := tree.GetSnapshotBatch(999)
+	_, found := tree.GetSnapshotBranch(999)
 	require.False(t, found, "Should not find snapshot for non-existent height")
 
 	// Test that snapshot batches reflect the state at exactly that height
@@ -546,22 +546,20 @@ func TestSnapshotPool(t *testing.T) {
 	finalHeight := int64(100)
 
 	// First batch at height 100
-	batch1 := tree.NewBatch()
-	batch1.SetHeight(finalHeight)
+	batch1 := tree.Branch()
 	batch1.Set([]byte("multi-key-1"), "first-batch")
 	batch1.Commit()
-	tree.Commit()
+	tree.Commit(finalHeight)
 
 	// Second batch at height 100 (should overwrite the snapshot)
-	batch2 := tree.NewBatch()
-	batch2.SetHeight(finalHeight)
+	batch2 := tree.Branch()
 	batch2.Set([]byte("multi-key-1"), "second-batch")
 	batch2.Set([]byte("multi-key-2"), "additional-value")
 	batch2.Commit()
-	tree.Commit()
+	tree.Commit(finalHeight)
 
 	// Get snapshot and verify it reflects the second batch
-	snapshotBatch, found := tree.GetSnapshotBatch(finalHeight)
+	snapshotBatch, found := tree.GetSnapshotBranch(finalHeight)
 	require.True(t, found, "Should find snapshot for final height")
 
 	val := snapshotBatch.Get([]byte("multi-key-1"))
@@ -573,34 +571,33 @@ func TestSnapshotPool(t *testing.T) {
 
 // TestNestedSnapshotBatches tests behavior with deeply nested batches and height management
 func TestNestedSnapshotBatches(t *testing.T) {
-	tree := NewTree()
+	tree := NewMemStoreManager()
 
 	// Create L1 with height 100
-	batchL1 := tree.NewBatch()
-	batchL1.SetHeight(100)
+	batchL1 := tree.Branch()
 	batchL1.Set([]byte("key"), "L1-value")
 
 	// Create L2 from L1
-	batchL2 := batchL1.NewNestedBatch()
+	batchL2 := batchL1.Branch()
 	batchL2.Set([]byte("key"), "L2-value")
 
 	// Create L3 from L2
-	batchL3 := batchL2.NewNestedBatch()
+	batchL3 := batchL2.Branch()
 	batchL3.Set([]byte("key"), "L3-value")
 
 	// Commit from L3 up to L1
 	batchL3.Commit() // L3 → L2
 	batchL2.Commit() // L2 → L1
 	batchL1.Commit() // L1 → tree
-	tree.Commit()    // tree.current -> tree.root
+	tree.Commit(100) // tree.current -> tree.root
 
 	// Verify final value in tree
-	currentBatch := tree.NewBatch()
+	currentBatch := tree.Branch()
 	val := currentBatch.Get([]byte("key"))
 	require.Equal(t, "L3-value", val, "Tree should have value from L3 after cascading commits")
 
 	// Get snapshot at height 100
-	snapshotBatch, found := tree.GetSnapshotBatch(100)
+	snapshotBatch, found := tree.GetSnapshotBranch(100)
 	require.True(t, found, "Should find snapshot at height 100")
 
 	val = snapshotBatch.Get([]byte("key"))
@@ -612,7 +609,7 @@ func TestNestedSnapshotBatches(t *testing.T) {
 	require.Equal(t, "modified-snapshot", val, "Can modify snapshot batch locally")
 
 	// But original snapshot should be unchanged
-	newSnapshotBatch, _ := tree.GetSnapshotBatch(100)
+	newSnapshotBatch, _ := tree.GetSnapshotBranch(100)
 	val = newSnapshotBatch.Get([]byte("key"))
 	require.Equal(t, "L3-value", val, "Original snapshot should be unchanged")
 }
@@ -622,17 +619,17 @@ func TestNestedSnapshotBatches(t *testing.T) {
 // causing a panic in the second commit.
 func TestSimpleConcurrentL1BatchCommitPanic(t *testing.T) {
 	// Create tree
-	tree := NewTree()
+	tree := NewMemStoreManager()
 
 	// Add initial data
-	initialBatch := tree.NewBatch()
+	initialBatch := tree.Branch()
 	initialBatch.Set([]byte("initial-key"), "initial-value")
 	initialBatch.Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	// Create two L1 batches from the same base state
-	batch1 := tree.NewBatch()
-	batch2 := tree.NewBatch()
+	batch1 := tree.Branch()
+	batch2 := tree.Branch()
 
 	// Both batches make different changes
 	batch1.Set([]byte("key-1"), "value-1")
@@ -640,7 +637,7 @@ func TestSimpleConcurrentL1BatchCommitPanic(t *testing.T) {
 
 	// First batch commits successfully
 	batch1.Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	// Verify first batch's changes are in the tree
 	val := tree.get("key-1")
@@ -659,7 +656,7 @@ func TestSimpleConcurrentL1BatchCommitPanic(t *testing.T) {
 
 	// This should cause a panic
 	batch2.Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	// This line should not be reached due to panic
 	t.Fatal("Expected panic did not occur")
@@ -669,8 +666,8 @@ func TestSimpleConcurrentL1BatchCommitPanic(t *testing.T) {
 // BenchmarkTreeBatchSet-12    	  244624	      5341 ns/op	   12467 B/op	      34 allocs/op
 func BenchmarkTreeBatchSet(b *testing.B) {
 	b.ReportAllocs()
-	tree := NewTree()
-	batch := tree.NewBatch()
+	tree := NewMemStoreManager()
+	batch := tree.Branch()
 	for i := 0; i < 50_000_000; i++ {
 		batch.Set(
 			[]byte(fmt.Sprintf("key-%d", i)),
@@ -678,16 +675,16 @@ func BenchmarkTreeBatchSet(b *testing.B) {
 		)
 	}
 	batch.Commit()
-	tree.Commit()
+	tree.Commit(1)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		batch := tree.NewBatch()
+		batch := tree.Branch()
 		batch.Set(
 			[]byte(fmt.Sprintf("key-%d", i)),
 			fmt.Sprintf("value-%d", i),
 		)
 		batch.Commit()
-		tree.Commit()
+		tree.Commit(1)
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/cometbft/cometbft/proto/tendermint/crypto"
 	dbm "github.com/cosmos/cosmos-db"
 
-	"cosmossdk.io/store/ephemeral"
 	"cosmossdk.io/store/metrics"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 	snapshottypes "cosmossdk.io/store/snapshots/types"
@@ -137,7 +136,7 @@ type MultiStore interface {
 	// If the store does not exist, panics.
 	GetStore(StoreKey) Store
 	GetKVStore(StoreKey) KVStore
-	GetEphemeralBatch() ephemeral.EphemeralBatch
+	GetMemStore() MemStore
 
 	// TracingEnabled returns if tracing is enabled for the MultiStore.
 	TracingEnabled() bool
@@ -212,7 +211,7 @@ type CommitMultiStore interface {
 	// SetIAVLDisableFastNode enables/disables fastnode feature on iavl.
 	SetIAVLDisableFastNode(disable bool)
 
-	SetWarmupEphemeral(f ...func(func(StoreKey) KVStore, ephemeral.EphemeralBatch))
+	SetWarmupMemStore(f ...func(func(StoreKey) KVStore, MemStore))
 
 	SetSnapshotPoolLimit(limit int64)
 

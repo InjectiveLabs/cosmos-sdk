@@ -20,10 +20,10 @@ import (
 	"cosmossdk.io/log"
 	"cosmossdk.io/store/cachemulti"
 	"cosmossdk.io/store/dbadapter"
-	"cosmossdk.io/store/ephemeral"
 	"cosmossdk.io/store/iavl"
 	"cosmossdk.io/store/listenkv"
 	"cosmossdk.io/store/mem"
+	"cosmossdk.io/store/memstore"
 	"cosmossdk.io/store/metrics"
 	"cosmossdk.io/store/pruning"
 	pruningtypes "cosmossdk.io/store/pruning/types"
@@ -77,8 +77,8 @@ type Store struct {
 	commitHeader        cmtproto.Header
 	commitSync          bool
 
-	ephemeralStore  ephemeral.EphemeralStore
-	warmupEphemeral []func(func(types.StoreKey) types.KVStore, ephemeral.EphemeralBatch)
+	memStoreManager types.MemStoreManager
+	warmupMemStore  []func(func(types.StoreKey) types.KVStore, types.MemStore)
 }
 
 var (
@@ -106,7 +106,7 @@ func NewStore(db dbm.DB, logger log.Logger, metricGatherer metrics.StoreMetrics)
 		pruningManager:      pruning.NewManager(db, logger),
 		metrics:             metricGatherer,
 
-		ephemeralStore: ephemeral.NewTree(),
+		memStoreManager: memstore.NewMemStoreManager(),
 	}
 }
 
@@ -149,12 +149,12 @@ func (rs *Store) SetIAVLDisableFastNode(disableFastNode bool) {
 	rs.iavlDisableFastNode = disableFastNode
 }
 
-func (rs *Store) SetWarmupEphemeral(f ...func(func(types.StoreKey) types.KVStore, ephemeral.EphemeralBatch)) {
-	rs.warmupEphemeral = f
+func (rs *Store) SetWarmupMemStore(f ...func(func(types.StoreKey) types.KVStore, types.MemStore)) {
+	rs.warmupMemStore = f
 }
 
 func (rs *Store) SetSnapshotPoolLimit(limit int64) {
-	rs.ephemeralStore.SetSnapshotPoolLimit(limit)
+	rs.memStoreManager.SetSnapshotPoolLimit(limit)
 }
 
 // GetStoreType implements Store.
@@ -315,16 +315,14 @@ func (rs *Store) loadVersion(ver int64, upgrades *types.StoreUpgrades) error {
 	rs.lastCommitInfo = cInfo
 	rs.stores = newStores
 
-	if rs.warmupEphemeral != nil {
-		rs.ephemeralStore.SetHeight(ver)
-
-		batch := rs.ephemeralStore.NewBatch()
-		uncommittableBatch := &ephemeral.UncommittableBatch{EphemeralBatch: batch}
-		for _, f := range rs.warmupEphemeral {
-			f(rs.GetKVStore, uncommittableBatch)
+	if rs.warmupMemStore != nil {
+		memStore := rs.memStoreManager.Branch()
+		uncommittableMemStore := &memstore.UncommittableMemStore{MemStore: memStore}
+		for _, f := range rs.warmupMemStore {
+			f(rs.GetKVStore, uncommittableMemStore)
 		}
-		batch.Commit()
-		rs.ephemeralStore.Commit()
+		memStore.Commit()
+		rs.memStoreManager.Commit(ver)
 	}
 
 	// load any snapshot heights we missed from disk to be pruned on the next run
@@ -519,7 +517,10 @@ func (rs *Store) Commit() types.CommitID {
 	rs.lastCommitInfo = commitStores(version, rs.stores, rs.removalMap)
 	rs.lastCommitInfo.Timestamp = rs.commitHeader.Time
 	defer rs.flushMetadata(rs.db, version, rs.lastCommitInfo)
-	defer rs.ephemeralStore.Commit()
+	defer func() {
+		height := rs.lastCommitInfo.Version
+		rs.memStoreManager.Commit(height)
+	}()
 
 	// remove remnants of removed stores
 	for sk := range rs.removalMap {
@@ -607,7 +608,7 @@ func (rs *Store) CacheMultiStore() types.CacheMultiStore {
 		rs.keysByName,
 		rs.traceWriter,
 		rs.getTracingContext(),
-		rs.ephemeralStore.NewBatch(),
+		rs.memStoreManager.Branch(),
 	)
 }
 
@@ -668,11 +669,11 @@ func (rs *Store) CacheMultiStoreWithVersion(version int64) (types.CacheMultiStor
 		cachedStores[key] = cacheStore
 	}
 
-	ephemeralSnapshotBatch, exists := rs.ephemeralStore.GetSnapshotBatch(version)
+	ephemeralSnapshotBatch, exists := rs.memStoreManager.GetSnapshotBranch(version)
 	if !exists {
-		if rs.warmupEphemeral == nil {
+		if rs.warmupMemStore == nil {
 			// NOTE(ephemeral): temporary fallback for testing
-			batch := rs.ephemeralStore.NewBatch()
+			batch := rs.memStoreManager.Branch()
 			ephemeralSnapshotBatch = batch
 		} else {
 			return nil, fmt.Errorf("no ephemeral snapshot found for version %d", version)
@@ -727,8 +728,8 @@ func (rs *Store) GetKVStore(key types.StoreKey) types.KVStore {
 	return store
 }
 
-func (rs *Store) GetEphemeralBatch() ephemeral.EphemeralBatch {
-	return rs.ephemeralStore.NewBatch()
+func (rs *Store) GetMemStore() types.MemStore {
+	return rs.memStoreManager.Branch()
 }
 
 func (rs *Store) handlePruning(version int64) error {

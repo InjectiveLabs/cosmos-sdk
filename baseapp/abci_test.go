@@ -231,9 +231,9 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 
 	blockPrefix := []byte{0x01}
 	app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
-		branch := ctx.MemStore()
+		memStore := ctx.MemStore()
 		typedKV := prefix.NewMemStore[*cmtproto.Block](
-			branch,
+			memStore,
 			blockPrefix,
 		)
 
@@ -244,9 +244,9 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 		// drop cacheCtx case
 		cacheCtx, _ := ctx.CacheContext()
 		{
-			branch := cacheCtx.MemStore()
+			memStore := cacheCtx.MemStore()
 			typedKV := prefix.
-				NewMemStore[*cmtproto.Block](branch, blockPrefix)
+				NewMemStore[*cmtproto.Block](memStore, blockPrefix)
 
 			typedKV.Set([]byte("block-2"), &cmtproto.Block{
 				Header: cmtproto.Header{Height: 2},
@@ -258,9 +258,9 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 
 		cacheCtx2, writeCache2 := ctx.CacheContext()
 		{
-			branch := cacheCtx2.MemStore()
+			memStore := cacheCtx2.MemStore()
 			typedKV := prefix.
-				NewMemStore[*cmtproto.Block](branch, blockPrefix)
+				NewMemStore[*cmtproto.Block](memStore, blockPrefix)
 
 			typedKV.Set([]byte("block-3"), &cmtproto.Block{
 				Header: cmtproto.Header{Height: 3},
@@ -286,8 +286,8 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 
 	cms := app.CommitMultiStore()
 	memStore := cms.GetMemStore()
-	typedBranch := prefix.NewMemStore[*cmtproto.Block](memStore, blockPrefix)
-	val := typedBranch.Get([]byte("block-1"))
+	typedmemStore := prefix.NewMemStore[*cmtproto.Block](memStore, blockPrefix)
+	val := typedmemStore.Get([]byte("block-1"))
 	require.Nil(t, val)
 
 	_, err = app.Commit()
@@ -296,15 +296,15 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 
 	// re-initialize after commit
 	memStore = cms.GetMemStore()
-	typedBranch = prefix.NewMemStore[*cmtproto.Block](memStore, blockPrefix)
-	val = typedBranch.Get([]byte("block-1"))
+	typedmemStore = prefix.NewMemStore[*cmtproto.Block](memStore, blockPrefix)
+	val = typedmemStore.Get([]byte("block-1"))
 	require.NotNil(t, val)
 	require.Equal(t, val.Header.Height, int64(1))
 
-	val = typedBranch.Get([]byte("block-2"))
+	val = typedmemStore.Get([]byte("block-2"))
 	require.Nil(t, val)
 
-	val = typedBranch.Get([]byte("block-3"))
+	val = typedmemStore.Get([]byte("block-3"))
 	require.NotNil(t, val)
 	require.Equal(t, val.Header.Height, int64(3))
 }
@@ -316,10 +316,10 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 	blockPrefix := []byte{0x01}
 	warmupCallback := func(
 		_ func(storetypes.StoreKey) storetypes.KVStore,
-		branch storetypes.MemStore,
+		memStore storetypes.MemStore,
 	) {
 		typedKV := prefix.
-			NewMemStore[*cmtproto.Block](branch, blockPrefix)
+			NewMemStore[*cmtproto.Block](memStore, blockPrefix)
 
 		val, err := db.Get([]byte("s/latest"))
 		if err != nil || val == nil {

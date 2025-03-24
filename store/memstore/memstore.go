@@ -16,11 +16,11 @@ type (
 	btree = internal.BTree
 
 	memStoreManager struct {
-		// root is an atomic pointer to the current root of the bbtreeStore.
+		// root is an atomic pointer to the current root of the memStoreManager.
 		// When a branch is committed, it creates a new root node and atomically
 		// swaps it with the existing one.
 		root *atomic.Pointer[btree]
-		// The current B-tree is stored in the root atomic.Pointer when btreeStore.Commit() occurs.
+		// The current B-tree is stored in the root atomic.Pointer when memStoreManager.Commit() occurs.
 		// The reason for creating it temporarily in this way is that it should not be read
 		// in the FinalizeBlock state before BaseApp.Commit happens.
 		//
@@ -43,13 +43,13 @@ type (
 		// current holds the current working copy of the btree for this top-level branch.
 		current *btree
 
-		// base points to btreeStore.base when the branch is created.
+		// base points to memStoreManager.base when the branch is created.
 		//
 		// If btreeStore.base differs from base at commit time, the commit fails and a panic occurs.
 		base *btree
 
-		// The tree exists to swap the pointer of btreeStore.current in the top-level branch.
-		tree *memStoreManager
+		// manager is a reference to the parent memStoreManager, used by top-level branches to update the manager during commit.
+		manager *memStoreManager
 	}
 
 	UncommittableMemStore struct {
@@ -58,10 +58,10 @@ type (
 )
 
 func (u *UncommittableMemStore) Commit() {
-	panic("uncommittable branch cannot be committed")
+	panic("uncommittable MemStore cannot be committed")
 }
 
-// NewMemStoreManager creates a new empty btreeStore.
+// NewMemStoreManager creates a new empty memStoreManager.
 func NewMemStoreManager() *memStoreManager {
 	tree := internal.NewBTree()
 
@@ -116,10 +116,15 @@ func (t *memStoreManager) Branch() types.MemStore {
 
 		current: current,
 		base:    base,
-		tree:    t,
+		manager: t,
 	}
 }
 
+// Commit finalizes the current state at the specified height by:
+// 1. Ensuring the base hasn't changed (preventing concurrent commits)
+// 2. Atomically updating the root btree with current changes
+// 3. Creating a snapshot at the given height for future queries
+// The height must be non-negative.
 func (t *memStoreManager) Commit(height int64) {
 	if height < 0 {
 		// NOTE: When height is 0, it occurs when calling LoadLatestVersion() on an empty app.
@@ -233,7 +238,7 @@ func (b *memStore) Branch() types.MemStore {
 
 // Commit applies the changes in the branch:
 // - For nested branches, it updates the parent branch's current pointer.
-// - For top-level branches, it replaces btreeStore.current with the branch's current writer.
+// - For top-level branches, it updates memStoreManager.current with the branch's current btree.
 func (b *memStore) Commit() {
 	if b.parent != nil {
 		// nested branch: update parent's current pointer
@@ -243,11 +248,11 @@ func (b *memStore) Commit() {
 
 	if b.current != nil {
 		// top-level branch: swap *btreeStore.current
-		if b.tree.base.Load() != b.base {
+		if b.manager.base.Load() != b.base {
 			panic("commit failed: concurrent modification detected")
 		}
 
-		b.tree.current = b.current
+		b.manager.current = b.current
 		return
 	}
 

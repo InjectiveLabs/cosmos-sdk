@@ -41,13 +41,13 @@ var _ types.CacheMultiStore = Store{}
 func NewFromKVStore(
 	store types.KVStore, stores map[types.StoreKey]types.CacheWrapper,
 	keys map[string]types.StoreKey, traceWriter io.Writer, traceContext types.TraceContext,
-	branch types.MemStore,
+	memStore types.MemStore,
 ) Store {
 	cms := Store{
 		db:       cachekv.NewStore(store),
 		stores:   make(map[types.StoreKey]types.CacheWrap, len(stores)),
 		keys:     keys,
-		memStore: branch,
+		memStore: memStore,
 
 		traceWriter:  traceWriter,
 		traceContext: traceContext,

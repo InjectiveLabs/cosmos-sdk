@@ -669,12 +669,12 @@ func (rs *Store) CacheMultiStoreWithVersion(version int64) (types.CacheMultiStor
 		cachedStores[key] = cacheStore
 	}
 
-	ephemeralSnapshotBatch, exists := rs.memStoreManager.GetSnapshotBranch(version)
+	memStoreSnapshot, exists := rs.memStoreManager.GetSnapshotBranch(version)
 	if !exists {
 		if rs.warmupMemStore == nil {
 			// NOTE(ephemeral): temporary fallback for testing
-			batch := rs.memStoreManager.Branch()
-			ephemeralSnapshotBatch = batch
+			memStore := rs.memStoreManager.Branch()
+			memStoreSnapshot = memStore
 		} else {
 			return nil, fmt.Errorf("no ephemeral snapshot found for version %d", version)
 		}
@@ -686,7 +686,7 @@ func (rs *Store) CacheMultiStoreWithVersion(version int64) (types.CacheMultiStor
 		rs.keysByName,
 		rs.traceWriter,
 		rs.getTracingContext(),
-		ephemeralSnapshotBatch,
+		memStoreSnapshot,
 	), nil
 }
 

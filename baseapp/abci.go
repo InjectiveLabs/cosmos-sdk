@@ -12,6 +12,7 @@ import (
 	"github.com/cockroachdb/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cmttypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/gogoproto/proto"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -974,6 +975,10 @@ func (app *BaseApp) checkHalt(height int64, time time.Time) error {
 	}
 
 	return nil
+}
+
+func (app *BaseApp) SetPublishEventsBlock(block *cmttypes.Block) {
+	app.flushData.Block = block
 }
 
 // Commit implements the ABCI interface. It will commit all state that exists in

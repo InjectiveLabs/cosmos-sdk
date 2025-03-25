@@ -384,6 +384,7 @@ func startCmtNode(
 		cmtcfg.DefaultDBProvider,
 		node.DefaultMetricsProvider(cfg.Instrumentation),
 		servercmtlog.CometLoggerWrapper{Logger: svrCtx.Logger},
+		nil,
 	)
 	if err != nil {
 		return tmNode, cleanupFn, err

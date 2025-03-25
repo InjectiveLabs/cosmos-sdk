@@ -2,6 +2,7 @@ package baseapp
 
 import (
 	abci "github.com/cometbft/cometbft/abci/types"
+	cmttypes "github.com/cometbft/cometbft/types"
 	types "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -24,6 +25,7 @@ type PublishEventFlush struct {
 	NewAppHash  []byte
 	BlockEvents EventSet
 	TxEvents    []EventSet
+	Block       *cmttypes.Block
 }
 
 func (app *BaseApp) PublishBlockEvents(flush PublishEventFlush) {

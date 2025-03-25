@@ -114,4 +114,28 @@ type (
 
 		Limit(length int64)
 	}
+
+	TypedPrefixMemStore[T any] interface {
+		Branch() TypedPrefixMemStore[T]
+
+		Get(key []byte) T
+
+		Iterator(start, end []byte) TypedPrefixMemStoreIterator[T]
+		ReverseIterator(start, end []byte) TypedPrefixMemStoreIterator[T]
+
+		Set(key []byte, value T)
+		Delete(key []byte)
+
+		Commit()
+	}
+
+	TypedPrefixMemStoreIterator[T any] interface {
+		Domain() ([]byte, []byte)
+		Valid() bool
+		Next()
+		Key() []byte
+		Value() T
+		Close() error
+		Error() error
+	}
 )

@@ -7,32 +7,6 @@ import (
 	"cosmossdk.io/store/types"
 )
 
-type (
-	TypedPrefixMemStore[T any] interface {
-		Branch() TypedPrefixMemStore[T]
-
-		Get(key []byte) T
-
-		Iterator(start, end []byte) TypedPrefixMemStoreIterator[T]
-		ReverseIterator(start, end []byte) TypedPrefixMemStoreIterator[T]
-
-		Set(key []byte, value T)
-		Delete(key []byte)
-
-		Commit()
-	}
-
-	TypedPrefixMemStoreIterator[T any] interface {
-		Domain() ([]byte, []byte)
-		Valid() bool
-		Next()
-		Key() []byte
-		Value() T
-		Close() error
-		Error() error
-	}
-)
-
 // typedPrefixMemStore integrates prefix functionality with type support
 type typedPrefixMemStore[T any] struct {
 	parent types.MemStore
@@ -40,7 +14,7 @@ type typedPrefixMemStore[T any] struct {
 }
 
 // NewMemStore creates a prefix memory store that supports generic type T
-func NewMemStore[T any](parent types.MemStore, prefix []byte) TypedPrefixMemStore[T] {
+func NewMemStore[T any](parent types.MemStore, prefix []byte) types.TypedPrefixMemStore[T] {
 	return &typedPrefixMemStore[T]{
 		parent: parent,
 		prefix: prefix,
@@ -84,7 +58,7 @@ func (b *typedPrefixMemStore[T]) Commit() {
 }
 
 // Branch creates a nested branch
-func (b *typedPrefixMemStore[T]) Branch() TypedPrefixMemStore[T] {
+func (b *typedPrefixMemStore[T]) Branch() types.TypedPrefixMemStore[T] {
 	return &typedPrefixMemStore[T]{
 		parent: b.parent.Branch(),
 		prefix: b.prefix,
@@ -92,7 +66,7 @@ func (b *typedPrefixMemStore[T]) Branch() TypedPrefixMemStore[T] {
 }
 
 // Iterator returns an iterator over the key-value pairs within the specified range
-func (b *typedPrefixMemStore[T]) Iterator(start, end []byte) TypedPrefixMemStoreIterator[T] {
+func (b *typedPrefixMemStore[T]) Iterator(start, end []byte) types.TypedPrefixMemStoreIterator[T] {
 	var newStart, newEnd []byte
 
 	if start == nil {
@@ -113,7 +87,7 @@ func (b *typedPrefixMemStore[T]) Iterator(start, end []byte) TypedPrefixMemStore
 }
 
 // ReverseIterator returns an iterator over the key-value pairs in reverse order
-func (b *typedPrefixMemStore[T]) ReverseIterator(start, end []byte) TypedPrefixMemStoreIterator[T] {
+func (b *typedPrefixMemStore[T]) ReverseIterator(start, end []byte) types.TypedPrefixMemStoreIterator[T] {
 	var newStart, newEnd []byte
 
 	if start == nil {

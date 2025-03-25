@@ -11,7 +11,6 @@ import (
 	"cosmossdk.io/core/comet"
 	"cosmossdk.io/core/header"
 	"cosmossdk.io/log"
-	"cosmossdk.io/store/ephemeral"
 	"cosmossdk.io/store/gaskv"
 	storetypes "cosmossdk.io/store/types"
 )
@@ -67,8 +66,8 @@ type Context struct {
 	cometInfo            comet.BlockInfo
 	headerInfo           header.Info
 
-	// extend Context with ephemeral batch
-	ephemeralBatch ephemeral.EphemeralBatch
+	// extend Context with memstore branch
+	memStore storetypes.MemStore
 }
 
 // Proposed rename, not done to avoid API breakage
@@ -350,8 +349,8 @@ func (c Context) KVStore(key storetypes.StoreKey) storetypes.KVStore {
 	return gaskv.NewStore(c.ms.GetKVStore(key), c.gasMeter, c.kvGasConfig)
 }
 
-func (c Context) EphemeralBatch() ephemeral.EphemeralBatch {
-	return c.ms.GetEphemeralBatch()
+func (c Context) MemStore() storetypes.MemStore {
+	return c.ms.GetMemStore()
 }
 
 // TransientStore fetches a TransientStore from the MultiStore.

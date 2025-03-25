@@ -28,7 +28,7 @@ import (
 
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
-	"cosmossdk.io/store/ephemeral"
+	"cosmossdk.io/store/prefix"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 	"cosmossdk.io/store/snapshots"
 	snapshottypes "cosmossdk.io/store/snapshots/types"
@@ -217,7 +217,7 @@ func TestABCI_FinalizeBlock_WithInitialHeight(t *testing.T) {
 	require.Equal(t, int64(3), app.LastBlockHeight())
 }
 
-func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
+func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 	name := t.Name()
 	db := dbm.NewMemDB()
 	app := baseapp.NewBaseApp(name, log.NewTestLogger(t), db, nil)
@@ -229,10 +229,13 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	blockPrefix := []byte{0x01}
 	app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
-		ekv := ctx.EphemeralBatch()
-		typedKV := ephemeral.
-			NewTypedBatch[*cmtproto.Block](ekv)
+		memStore := ctx.MemStore()
+		typedKV := prefix.NewMemStore[*cmtproto.Block](
+			memStore,
+			blockPrefix,
+		)
 
 		typedKV.Set([]byte("block-1"), &cmtproto.Block{
 			Header: cmtproto.Header{Height: 1},
@@ -241,9 +244,9 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 		// drop cacheCtx case
 		cacheCtx, _ := ctx.CacheContext()
 		{
-			ekv := cacheCtx.EphemeralBatch()
-			typedKV := ephemeral.
-				NewTypedBatch[*cmtproto.Block](ekv)
+			memStore := cacheCtx.MemStore()
+			typedKV := prefix.
+				NewMemStore[*cmtproto.Block](memStore, blockPrefix)
 
 			typedKV.Set([]byte("block-2"), &cmtproto.Block{
 				Header: cmtproto.Header{Height: 2},
@@ -255,9 +258,9 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 
 		cacheCtx2, writeCache2 := ctx.CacheContext()
 		{
-			ekv := cacheCtx2.EphemeralBatch()
-			typedKV := ephemeral.
-				NewTypedBatch[*cmtproto.Block](ekv)
+			memStore := cacheCtx2.MemStore()
+			typedKV := prefix.
+				NewMemStore[*cmtproto.Block](memStore, blockPrefix)
 
 			typedKV.Set([]byte("block-3"), &cmtproto.Block{
 				Header: cmtproto.Header{Height: 3},
@@ -282,8 +285,9 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 	require.NoError(t, err)
 
 	cms := app.CommitMultiStore()
-	ephemeral := cms.GetEphemeralBatch()
-	val := ephemeral.Get([]byte("block-1"))
+	memStore := cms.GetMemStore()
+	typedmemStore := prefix.NewMemStore[*cmtproto.Block](memStore, blockPrefix)
+	val := typedmemStore.Get([]byte("block-1"))
 	require.Nil(t, val)
 
 	_, err = app.Commit()
@@ -291,29 +295,31 @@ func TestABCI_EphemeralCacheContextLifecycle(t *testing.T) {
 	require.Equal(t, int64(3), app.LastBlockHeight())
 
 	// re-initialize after commit
-	ephemeral = cms.GetEphemeralBatch()
-	val = ephemeral.Get([]byte("block-1"))
+	memStore = cms.GetMemStore()
+	typedmemStore = prefix.NewMemStore[*cmtproto.Block](memStore, blockPrefix)
+	val = typedmemStore.Get([]byte("block-1"))
 	require.NotNil(t, val)
-	require.Equal(t, val.(*cmtproto.Block).Header.Height, int64(1))
+	require.Equal(t, val.Header.Height, int64(1))
 
-	val = ephemeral.Get([]byte("block-2"))
+	val = typedmemStore.Get([]byte("block-2"))
 	require.Nil(t, val)
 
-	val = ephemeral.Get([]byte("block-3"))
+	val = typedmemStore.Get([]byte("block-3"))
 	require.NotNil(t, val)
-	require.Equal(t, val.(*cmtproto.Block).Header.Height, int64(3))
+	require.Equal(t, val.Header.Height, int64(3))
 }
 
-func TestABCI_EphemeralWarmpup(t *testing.T) {
+func TestABCI_MemStoreWarmpup(t *testing.T) {
 	name := t.Name()
 	db := dbm.NewMemDB()
 
+	blockPrefix := []byte{0x01}
 	warmupCallback := func(
 		_ func(storetypes.StoreKey) storetypes.KVStore,
-		batch ephemeral.EphemeralBatch,
+		memStore storetypes.MemStore,
 	) {
-		typedKV := ephemeral.
-			NewTypedBatch[*cmtproto.Block](batch)
+		typedKV := prefix.
+			NewMemStore[*cmtproto.Block](memStore, blockPrefix)
 
 		val, err := db.Get([]byte("s/latest"))
 		if err != nil || val == nil {
@@ -339,11 +345,11 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 			nil,
 		)
 
-		app.SetWarmupEphemeralStore(warmupCallback)
+		app.SetWarmupMemStore(warmupCallback)
 		app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
-			ekv := ctx.EphemeralBatch()
-			typedKV := ephemeral.
-				NewTypedBatch[*cmtproto.Block](ekv)
+			ekv := ctx.MemStore()
+			typedKV := prefix.
+				NewMemStore[*cmtproto.Block](ekv, blockPrefix)
 
 			header := ctx.BlockHeader()
 			typedKV.Set(
@@ -383,19 +389,19 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 		nextBlock(app)
 	}
 
-	ephemeralSnapshot := []struct {
+	memStoreSnapshot := []struct {
 		key   []byte
-		value any
+		value *cmtproto.Block
 	}{}
 	{
 		cms := app.CommitMultiStore()
-		ekv := cms.GetEphemeralBatch()
-		typedEkv := ephemeral.NewTypedBatch[*cmtproto.Block](ekv)
+		ekv := cms.GetMemStore()
+		typedEkv := prefix.NewMemStore[*cmtproto.Block](ekv, blockPrefix)
 		iter := typedEkv.Iterator(nil, nil)
 		for ; iter.Valid(); iter.Next() {
-			ephemeralSnapshot = append(ephemeralSnapshot, struct {
+			memStoreSnapshot = append(memStoreSnapshot, struct {
 				key   []byte
-				value any
+				value *cmtproto.Block
 			}{
 				key:   iter.Key(),
 				value: iter.Value(),
@@ -406,11 +412,11 @@ func TestABCI_EphemeralWarmpup(t *testing.T) {
 	require.NoError(t, app.Close())
 
 	app2 := newApp(db)
-	{ // check ephemeral snapshot
+	{ // check memStore snapshot
 		cms := app2.CommitMultiStore()
-		ekv := cms.GetEphemeralBatch()
-		typedEkv := ephemeral.NewTypedBatch[*cmtproto.Block](ekv)
-		for _, kv := range ephemeralSnapshot {
+		ekv := cms.GetMemStore()
+		typedEkv := prefix.NewMemStore[*cmtproto.Block](ekv, blockPrefix)
+		for _, kv := range memStoreSnapshot {
 			val := typedEkv.Get(kv.key)
 			require.Equal(t, kv.value, val)
 		}

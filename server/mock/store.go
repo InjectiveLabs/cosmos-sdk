@@ -6,10 +6,10 @@ import (
 	dbm "github.com/cosmos/cosmos-db"
 	protoio "github.com/cosmos/gogoproto/io"
 
-	"cosmossdk.io/store/ephemeral"
 	"cosmossdk.io/store/metrics"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 	snapshottypes "cosmossdk.io/store/snapshots/types"
+	"cosmossdk.io/store/types"
 	storetypes "cosmossdk.io/store/types"
 )
 
@@ -19,7 +19,7 @@ type multiStore struct {
 	kv map[storetypes.StoreKey]kvStore
 }
 
-func (ms multiStore) SetWarmupEphemeral(...func(func(storetypes.StoreKey) storetypes.KVStore, ephemeral.EphemeralBatch)) {
+func (ms multiStore) SetWarmupMemStore(...func(func(storetypes.StoreKey) storetypes.KVStore, types.MemStore)) {
 	panic("not implemented")
 }
 
@@ -27,7 +27,7 @@ func (ms multiStore) SetSnapshotPoolLimit(int64) {
 	panic("not implemented")
 }
 
-func (ms multiStore) GetEphemeralBatch() ephemeral.EphemeralBatch {
+func (ms multiStore) GetMemStore() types.MemStore {
 	panic("not implemented")
 }
 

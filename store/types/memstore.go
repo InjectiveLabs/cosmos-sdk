@@ -115,27 +115,76 @@ type (
 		Limit(length int64)
 	}
 
+	// TypedPrefixMemStore defines operations that can be performed on a prefix memory store with generic type support.
+	// It provides type-safe access to values of type T, automatically handling type conversion and prefix management.
+	// The interface is designed to allow for isolation of key spaces with prefix scoping while maintaining type safety.
 	TypedPrefixMemStore[T any] interface {
+		// Branch creates a nested TypedPrefixMemStore with the same prefix and type parameter.
+		// It creates an independent workspace that can be committed back to the parent.
 		Branch() TypedPrefixMemStore[T]
 
+		// Get retrieves a value for the given key and returns it as type T.
+		// If the key does not exist, returns the zero value of T.
 		Get(key []byte) T
 
+		// Iterator returns an iterator over the key-value pairs within the specified range.
+		// The keys in the iterator will have the prefix removed for easier access.
+		//
+		// The iterator will include items with key >= start and key < end.
+		// If start is nil, it returns all items from the beginning of the prefix.
+		// If end is nil, it returns all items until the end of the prefix.
 		Iterator(start, end []byte) TypedPrefixMemStoreIterator[T]
+
+		// ReverseIterator returns an iterator over the key-value pairs in reverse order.
+		// The keys in the iterator will have the prefix removed for easier access.
+		//
+		// The iterator will include items with key >= start and key < end, in reverse order.
+		// If start is nil, it returns all items from the beginning of the prefix.
+		// If end is nil, it returns all items until the end of the prefix.
 		ReverseIterator(start, end []byte) TypedPrefixMemStoreIterator[T]
 
+		// Set adds or updates a key-value pair of type T.
+		// The key will be automatically prefixed before storage.
 		Set(key []byte, value T)
+
+		// Delete removes a key from the store.
+		// The key will be automatically prefixed before deletion.
 		Delete(key []byte)
 
+		// Commit applies the changes in the current store to its parent.
 		Commit()
 	}
 
+	// TypedPrefixMemStoreIterator defines an interface for traversing key-value pairs in a typed prefix store.
+	// It provides type-safe access to values and automatically handles prefix stripping from keys.
+	// Callers must call Close when done to release any allocated resources.
 	TypedPrefixMemStoreIterator[T any] interface {
+		// Domain returns the start and end keys defining the range of this iterator.
+		// The returned values match what was passed to Iterator() or ReverseIterator().
 		Domain() ([]byte, []byte)
+
+		// Valid returns whether the iterator is positioned at a valid item.
+		// Once false, Valid() will never return true again.
 		Valid() bool
+
+		// Next moves the iterator to the next item.
+		// If Valid() returns false after this call, the iteration is complete.
 		Next()
+
+		// Key returns the current key with the prefix stripped.
+		// Panics if the iterator is not valid.
 		Key() []byte
+
+		// Value returns the current value as type T.
+		// If the iterator is not valid, returns the zero value of T.
 		Value() T
+
+		// Close releases any resources associated with the iterator.
+		// It must be called when done using the iterator.
 		Close() error
+
+		// Error returns an error if the iterator is invalid.
+		// Returns nil if the iterator is valid.
 		Error() error
 	}
 )

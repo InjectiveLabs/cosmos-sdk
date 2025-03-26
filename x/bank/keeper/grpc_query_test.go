@@ -120,6 +120,10 @@ func (suite *KeeperTestSuite) TestQueryAllBalances() {
 	origCoins := sdk.NewCoins(fooCoins, barCoins, ibcCoins)
 
 	suite.mockFundAccount(addr)
+	// required when multiple coins are sent to an account
+	for i := 0; i < len(origCoins)-1; i++ {
+		suite.authKeeper.EXPECT().HasAccount(ctx, addr).Return(true)
+	}
 	suite.Require().NoError(testutil.FundAccount(ctx, suite.bankKeeper, addr, origCoins))
 
 	addIBCMetadata(ctx, suite.bankKeeper)
@@ -207,6 +211,8 @@ func (suite *KeeperTestSuite) TestSpendableBalances() {
 	suite.Require().NoError(err)
 
 	suite.mockFundAccount(addr)
+	// required when multiple coins are sent to an account
+	suite.authKeeper.EXPECT().HasAccount(suite.ctx, addr).Return(true)
 	suite.Require().NoError(testutil.FundAccount(suite.ctx, suite.bankKeeper, addr, origCoins))
 
 	// move time forward for some tokens to vest
@@ -255,6 +261,8 @@ func (suite *KeeperTestSuite) TestSpendableBalanceByDenom() {
 	suite.Require().NoError(err)
 
 	suite.mockFundAccount(addr)
+	// required when multiple coins are sent to an account
+	suite.authKeeper.EXPECT().HasAccount(suite.ctx, addr).Return(true)
 	suite.Require().NoError(testutil.FundAccount(suite.ctx, suite.bankKeeper, addr, origCoins))
 
 	// move time forward for half of the tokens to vest

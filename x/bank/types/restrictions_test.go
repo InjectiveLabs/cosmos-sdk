@@ -433,24 +433,24 @@ func (s *SendRestrictionTestHelper) NewArgs(name string, fromAddr, toAddr sdk.Ac
 
 // NamedRestriction creates a new SendRestrictionFn function that records the arguments it's called with and returns the provided toAddr.
 func (s *SendRestrictionTestHelper) NamedRestriction(name string) types.SendRestrictionFn {
-	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coins) (sdk.AccAddress, error) {
-		s.RecordCall(name, fromAddr, toAddr, coins)
+	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coin) (sdk.AccAddress, error) {
+		s.RecordCall(name, fromAddr, toAddr, sdk.Coins{coins})
 		return toAddr, nil
 	}
 }
 
 // NewToRestriction creates a new SendRestrictionFn function that returns a different toAddr than provided.
 func (s *SendRestrictionTestHelper) NewToRestriction(name string, addr sdk.AccAddress) types.SendRestrictionFn {
-	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coins) (sdk.AccAddress, error) {
-		s.RecordCall(name, fromAddr, toAddr, coins)
+	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coin) (sdk.AccAddress, error) {
+		s.RecordCall(name, fromAddr, toAddr, sdk.Coins{coins})
 		return addr, nil
 	}
 }
 
 // ErrorRestriction creates a new SendRestrictionFn function that returns a nil toAddr and an error.
 func (s *SendRestrictionTestHelper) ErrorRestriction(message string) types.SendRestrictionFn {
-	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coins) (sdk.AccAddress, error) {
-		s.RecordCall(message, fromAddr, toAddr, coins)
+	return func(_ context.Context, fromAddr, toAddr sdk.AccAddress, coins sdk.Coin) (sdk.AccAddress, error) {
+		s.RecordCall(message, fromAddr, toAddr, sdk.Coins{coins})
 		return nil, errors.New(message)
 	}
 }
@@ -482,7 +482,7 @@ func (s *SendRestrictionTestHelper) TestActual(t *testing.T, tp *SendRestriction
 	} else {
 		require.NotNil(t, actual, "resulting SendRestrictionFn")
 		s.Calls = s.Calls[:0]
-		addr, err := actual(sdk.Context{}, tp.FromAddr, tp.ToAddr, tp.Coins)
+		addr, err := actual(sdk.Context{}, tp.FromAddr, tp.ToAddr, tp.Coins[0])
 		if len(tp.ExpErr) != 0 {
 			assert.EqualError(t, err, tp.ExpErr, "composite SendRestrictionFn output error")
 		} else {
@@ -500,7 +500,8 @@ func TestSendRestriction_Then(t *testing.T) {
 	addr2 := sdk.AccAddress("2addr_______________")
 	addr3 := sdk.AccAddress("3addr_______________")
 	addr4 := sdk.AccAddress("4addr_______________")
-	coins := sdk.NewCoins(sdk.NewInt64Coin("ecoin", 32), sdk.NewInt64Coin("fcoin", 64))
+	// SendRestrictionFn only takes one coin since https://github.com/InjectiveLabs/cosmos-sdk/commit/59f4bfe90556ee3b13f6a99fb27759d1ceedfa49
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ecoin", 32))
 
 	h := NewSendRestrictionTestHelper()
 
@@ -655,7 +656,8 @@ func TestComposeSendRestrictions(t *testing.T) {
 	addr2 := sdk.AccAddress("2addr_______________")
 	addr3 := sdk.AccAddress("3addr_______________")
 	addr4 := sdk.AccAddress("4addr_______________")
-	coins := sdk.NewCoins(sdk.NewInt64Coin("gcoin", 128), sdk.NewInt64Coin("hcoin", 256))
+	// SendRestrictionFn only takes one coin since https://github.com/InjectiveLabs/cosmos-sdk/commit/59f4bfe90556ee3b13f6a99fb27759d1ceedfa49
+	coins := sdk.NewCoins(sdk.NewInt64Coin("gcoin", 128))
 
 	h := NewSendRestrictionTestHelper()
 
@@ -911,7 +913,7 @@ func TestNoOpSendRestrictionFn(t *testing.T) {
 	var addr sdk.AccAddress
 	var err error
 	testFunc := func() {
-		addr, err = types.NoOpSendRestrictionFn(sdk.Context{}, sdk.AccAddress("first_addr"), expAddr, sdk.Coins{})
+		addr, err = types.NoOpSendRestrictionFn(sdk.Context{}, sdk.AccAddress("first_addr"), expAddr, sdk.Coin{})
 	}
 	require.NotPanics(t, testFunc, "NoOpSendRestrictionFn")
 	assert.NoError(t, err, "NoOpSendRestrictionFn error")

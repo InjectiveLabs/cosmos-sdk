@@ -774,7 +774,7 @@ func TestAnteHandlerMultiSigner(t *testing.T) {
 				require.NoError(t, err)
 
 				msgs = []sdk.Msg{msg1}
-				privs, accNums, accSeqs = []cryptotypes.PrivKey{accs[0].priv, accs[1].priv}, []uint64{accs[0].acc.GetAccountNumber(), accs[1].acc.GetAccountNumber()}, []uint64{accs[0].acc.GetSequence() + 1, accs[1].acc.GetSequence() + 1}
+				privs, accNums, accSeqs = []cryptotypes.PrivKey{accs[0].priv, accs[1].priv}, []uint64{accs[0].acc.GetAccountNumber(), accs[1].acc.GetAccountNumber()}, []uint64{accs[0].acc.GetSequence(), accs[1].acc.GetSequence() + 1}
 
 				return TestCaseArgs{
 					accNums: accNums,
@@ -837,7 +837,9 @@ func TestAnteHandlerMultiSigner(t *testing.T) {
 				suite.ctx, err = suite.DeliverMsgs(t, privs, msgs, feeAmount, gasLimit, accNums, accSeqs, suite.ctx.ChainID(), false)
 				require.NoError(t, err)
 
-				for _, acc := range accs {
+				// first signer's sequence isn't increased since it's used as fee payer by default
+				// and they're mutiple signer, see c053612
+				for _, acc := range accs[1:] {
 					require.NoError(t, acc.acc.SetSequence(acc.acc.GetSequence()+1))
 				}
 

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	cmtproto "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	"gotest.tools/v3/assert"
 	"pgregory.net/rapid"
 
@@ -100,6 +100,7 @@ func initDeterministicFixture(t *testing.T) *deterministicFixture {
 	bankKeeper := bankkeeper.NewBaseKeeper(
 		cdc,
 		runtime.NewKVStoreService(keys[banktypes.StoreKey]),
+		nil,
 		accountKeeper,
 		blockedAddresses,
 		authority.String(),

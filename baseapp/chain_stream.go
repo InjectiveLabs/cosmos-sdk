@@ -19,6 +19,7 @@ func (app *BaseApp) AddStreamEvents(height int64, blockTime time.Time, events []
 			Events:    events,
 			Height:    uint64(height),
 			BlockTime: blockTime,
+			Flush:     flush,
 		}
 	}
 }

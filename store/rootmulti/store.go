@@ -18,6 +18,7 @@ import (
 
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
+
 	"cosmossdk.io/store/cachemulti"
 	"cosmossdk.io/store/dbadapter"
 	"cosmossdk.io/store/iavl"
@@ -672,11 +673,11 @@ func (rs *Store) CacheMultiStoreWithVersion(version int64) (types.CacheMultiStor
 	memStoreSnapshot, exists := rs.memStoreManager.GetSnapshotBranch(version)
 	if !exists {
 		if rs.warmupMemStore == nil {
-			// NOTE(ephemeral): temporary fallback for testing
+			// NOTE: temporary fallback for testing
 			memStore := rs.memStoreManager.Branch()
 			memStoreSnapshot = memStore
 		} else {
-			return nil, fmt.Errorf("no ephemeral snapshot found for version %d", version)
+			return nil, fmt.Errorf("no memstore snapshot found for version %d", version)
 		}
 	}
 

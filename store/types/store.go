@@ -298,9 +298,9 @@ type CommitKVStore interface {
 //----------------------------------------
 // CacheWrap
 
-// CacheWrap is the most appropriate interface for store ephemeral branching and cache.
+// CacheWrap is the most appropriate interface for memstore branching and cache.
 // For example, IAVLStore.CacheWrap() returns a CacheKVStore. CacheWrap should not return
-// a Committer, since Commit ephemeral store make no sense. It can return KVStore,
+// a Committer, since Commit memstore make no sense. It can return KVStore,
 // HeapStore, SpaceStore, etc.
 type CacheWrap interface {
 	// Write syncs with the underlying store.

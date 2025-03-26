@@ -53,14 +53,14 @@ func (bt BTree) Get(key []byte) any {
 	return i.value
 }
 
-func (bt BTree) Iterator(start, end []byte) (TypedEphemeralIterator[any], error) {
+func (bt BTree) Iterator(start, end []byte) (TypedMemIterator[any], error) {
 	if (start != nil && len(start) == 0) || (end != nil && len(end) == 0) {
 		return nil, errKeyEmpty
 	}
 	return newMemIterator(start, end, bt, true), nil
 }
 
-func (bt BTree) ReverseIterator(start, end []byte) (TypedEphemeralIterator[any], error) {
+func (bt BTree) ReverseIterator(start, end []byte) (TypedMemIterator[any], error) {
 	if (start != nil && len(start) == 0) || (end != nil && len(end) == 0) {
 		return nil, errKeyEmpty
 	}

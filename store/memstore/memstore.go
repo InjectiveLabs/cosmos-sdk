@@ -139,7 +139,7 @@ func (t *memStoreManager) Commit(height int64) {
 	current := t.current
 
 	if current == nil {
-		panic("`EphemeralStore.Commit(..)` should not be called on an ephemeral store retrieved from the snapshot pool.")
+		panic("`MemStore.Commit(..)` should not be called on an memstore retrieved from the snapshot pool.")
 	}
 
 	copiedTree := current.Copy()
@@ -177,7 +177,7 @@ func (b *memStore) Get(key []byte) any {
 //
 // If an error occurs during initialization, this method panics.
 func (b *memStore) Iterator(start, end []byte) types.MemStoreIterator {
-	// NOTE(ephemeral): If a snapshot is not created, the current BTree cannot be modified until the Iterator is closed.
+	// NOTE: If a snapshot is not created, the current BTree cannot be modified until the Iterator is closed.
 	snapshot := b.current.Copy()
 
 	iter, err := snapshot.Iterator(start, end)
@@ -197,7 +197,7 @@ func (b *memStore) Iterator(start, end []byte) types.MemStoreIterator {
 //
 // If an error occurs during initialization, this method panics.
 func (b *memStore) ReverseIterator(start, end []byte) types.MemStoreIterator {
-	// NOTE(ephemeral): If a snapshot is not created, the current BTree cannot be modified until the Iterator is closed.
+	// NOTE: If a snapshot is not created, the current BTree cannot be modified until the Iterator is closed.
 	snapshot := b.current.Copy()
 
 	iter, err := snapshot.ReverseIterator(start, end)

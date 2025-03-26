@@ -1,6 +1,6 @@
 package internal
 
-type TypedEphemeralIterator[T any] interface {
+type TypedMemIterator[T any] interface {
 	Next()
 	Key() []byte
 	Value() T

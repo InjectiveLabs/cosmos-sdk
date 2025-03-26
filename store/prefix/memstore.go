@@ -24,7 +24,7 @@ func NewMemStore[T any](parent types.MemStore, prefix []byte) types.TypedPrefixM
 // key prefixes the given key with the store's prefix
 func (b *typedPrefixMemStore[T]) key(key []byte) (res []byte) {
 	if key == nil {
-		panic("nil key on PrefixEphemeralBatch")
+		panic("nil key on PrefixMemBatch")
 	}
 	res = cloneAppend(b.prefix, key)
 	return

@@ -405,7 +405,7 @@ func (app *BaseApp) SetGRPCQueryRouter(grpcQueryRouter *GRPCQueryRouter) {
 
 func (app *BaseApp) SetWarmupMemStore(cbs ...func(func(storetypes.StoreKey) storetypes.KVStore, storetypes.MemStore)) {
 	if app.sealed {
-		panic("SetWarmupEphemeralStore() on sealed BaseApp")
+		panic("SetWarmupMemStore() on sealed BaseApp")
 	}
 
 	app.cms.SetWarmupMemStore(cbs...)

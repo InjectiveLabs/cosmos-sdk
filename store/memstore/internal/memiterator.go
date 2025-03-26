@@ -7,7 +7,7 @@ import (
 	"github.com/tidwall/btree"
 )
 
-var _ TypedEphemeralIterator[any] = (*memIterator)(nil)
+var _ TypedMemIterator[any] = (*memIterator)(nil)
 
 // memIterator iterates over iterKVCache items.
 // if value is nil, means it was deleted.

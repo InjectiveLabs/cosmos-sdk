@@ -32,6 +32,10 @@ func (suite *KeeperTestSuite) TestExportGenesis() {
 			Require().
 			NoError(suite.bankKeeper.MintCoins(ctx, minttypes.ModuleName, expectedBalances[i].Coins))
 		suite.mockSendCoinsFromModuleToAccount(mintAcc, accAddr)
+		// required when multiple coins are sent
+		if len(expectedBalances[i].Coins) > 1 {
+			suite.authKeeper.EXPECT().HasAccount(ctx, accAddr).Return(true)
+		}
 		suite.
 			Require().
 			NoError(suite.bankKeeper.SendCoinsFromModuleToAccount(ctx, minttypes.ModuleName, accAddr, expectedBalances[i].Coins))

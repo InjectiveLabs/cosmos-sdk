@@ -1,8 +1,9 @@
 package memstore
 
 import (
-	"cosmossdk.io/store/types"
 	"fmt"
+
+	"cosmossdk.io/store/types"
 )
 
 var _ types.MemStore = (*unusableMemstore)(nil)
@@ -20,36 +21,29 @@ func NewUnusableMemstore(height int64) types.MemStore {
 }
 
 func (u *unusableMemstore) Branch() types.MemStore {
-	//TODO implement me
 	panic(fmt.Sprintf("no %d height memstore snapshot", u.height))
 }
 
 func (u *unusableMemstore) Get(key []byte) any {
-	//TODO implement me
 	panic(fmt.Sprintf("no %d height memstore snapshot", u.height))
 }
 
 func (u *unusableMemstore) Iterator(start, end []byte) types.MemStoreIterator {
-	//TODO implement me
 	panic(fmt.Sprintf("no %d height memstore snapshot", u.height))
 }
 
 func (u *unusableMemstore) ReverseIterator(start, end []byte) types.MemStoreIterator {
-	//TODO implement me
 	panic(fmt.Sprintf("no %d height memstore snapshot", u.height))
 }
 
 func (u *unusableMemstore) Set(key []byte, value any) {
-	//TODO implement me
 	panic(fmt.Sprintf("no %d height memstore snapshot", u.height))
 }
 
 func (u *unusableMemstore) Delete(key []byte) {
-	//TODO implement me
 	panic(fmt.Sprintf("no %d height memstore snapshot", u.height))
 }
 
 func (u *unusableMemstore) Commit() {
-	//TODO implement me
 	panic(fmt.Sprintf("no %d height memstore snapshot", u.height))
 }

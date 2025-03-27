@@ -38,12 +38,12 @@ func (b *prefixMemStore) key(key []byte) (res []byte) {
 }
 
 // Get retrieves a value for the given key
-func (b *prefixMemStore) Get(key []byte) interface{} {
+func (b *prefixMemStore) Get(key []byte) any {
 	return b.parent.Get(b.key(key))
 }
 
 // Set adds or updates a key-value pair
-func (b *prefixMemStore) Set(key []byte, value interface{}) {
+func (b *prefixMemStore) Set(key []byte, value any) {
 	b.parent.Set(b.key(key), value)
 }
 
@@ -161,7 +161,7 @@ func (pi *prefixMemStoreIterator) Key() []byte {
 }
 
 // Value returns the current value
-func (pi *prefixMemStoreIterator) Value() interface{} {
+func (pi *prefixMemStoreIterator) Value() any {
 	if !pi.valid {
 		return nil
 	}

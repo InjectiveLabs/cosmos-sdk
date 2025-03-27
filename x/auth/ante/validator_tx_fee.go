@@ -1,6 +1,7 @@
 package ante
 
 import (
+	"fmt"
 	"math"
 
 	errorsmod "cosmossdk.io/errors"
@@ -26,6 +27,7 @@ func CheckTxFeeWithValidatorMinGasPrices(ctx sdk.Context, tx sdk.Tx) (sdk.Coins,
 	// is only ran on check tx.
 	if ctx.IsCheckTx() {
 		minGasPrices := ctx.MinGasPrices()
+		fmt.Println("minGasPrices", minGasPrices)
 		if !minGasPrices.IsZero() {
 			requiredFees := make(sdk.Coins, len(minGasPrices))
 

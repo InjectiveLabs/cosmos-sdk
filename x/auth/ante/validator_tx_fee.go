@@ -27,7 +27,8 @@ func CheckTxFeeWithValidatorMinGasPrices(ctx sdk.Context, tx sdk.Tx) (sdk.Coins,
 	// is only ran on check tx.
 	if ctx.IsCheckTx() {
 		minGasPrices := ctx.MinGasPrices()
-		fmt.Println("minGasPrices", minGasPrices)
+		fmt.Println("Logging minGasPrices from CheckTxFeeWithValidatorMinGasPrices", minGasPrices)
+		ctx.Logger().Info("Logging minGasPrices from CheckTxFeeWithValidatorMinGasPrices", "minGasPrices", minGasPrices)
 		if !minGasPrices.IsZero() {
 			requiredFees := make(sdk.Coins, len(minGasPrices))
 

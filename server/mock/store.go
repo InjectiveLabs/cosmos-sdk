@@ -19,7 +19,7 @@ type multiStore struct {
 	kv map[storetypes.StoreKey]kvStore
 }
 
-func (ms multiStore) SetWarmupMemStore(...func(func(storetypes.StoreKey) storetypes.KVStore, types.MemStore)) {
+func (ms multiStore) SetMemStoreManager(types.MemStoreManager) {
 	panic("not implemented")
 }
 

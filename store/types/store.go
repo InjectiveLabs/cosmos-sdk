@@ -211,7 +211,7 @@ type CommitMultiStore interface {
 	// SetIAVLDisableFastNode enables/disables fastnode feature on iavl.
 	SetIAVLDisableFastNode(disable bool)
 
-	SetWarmupMemStore(f ...func(func(StoreKey) KVStore, MemStore))
+	SetMemStoreManager(memStore MemStoreManager)
 
 	SetSnapshotPoolLimit(limit int64)
 

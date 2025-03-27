@@ -232,9 +232,7 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 
 	blockPrefix := []byte{0x01}
 	app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
-		memStore := ctx.MemStore()
-		// Separate prefix and typed functionality
-		prefixedStore := prefix.NewMemStore(memStore, blockPrefix)
+		prefixedStore := ctx.MemStore(blockPrefix)
 		typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
 
 		typedStore.Set([]byte("block-1"), &cmtproto.Block{
@@ -244,9 +242,8 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 		// drop cacheCtx case
 		cacheCtx, _ := ctx.CacheContext()
 		{
-			memStore := cacheCtx.MemStore()
 			// Separate prefix and typed functionality
-			prefixedStore := prefix.NewMemStore(memStore, blockPrefix)
+			prefixedStore := cacheCtx.MemStore(blockPrefix)
 			typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
 
 			typedStore.Set([]byte("block-2"), &cmtproto.Block{
@@ -259,9 +256,8 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 
 		cacheCtx2, writeCache2 := ctx.CacheContext()
 		{
-			memStore := cacheCtx2.MemStore()
 			// Separate prefix and typed functionality
-			prefixedStore := prefix.NewMemStore(memStore, blockPrefix)
+			prefixedStore := cacheCtx2.MemStore(blockPrefix)
 			typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
 
 			typedStore.Set([]byte("block-3"), &cmtproto.Block{
@@ -322,13 +318,13 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 	db := dbm.NewMemDB()
 
 	blockPrefix := []byte{0x01}
-	warmupCallback := func(
-		_ func(storetypes.StoreKey) storetypes.KVStore,
-		memStore storetypes.MemStore,
+	warmupFunction := func(
+		ctx sdk.Context,
 	) {
 		// Separate prefix and typed functionality
-		prefixedStore := prefix.NewMemStore(memStore, blockPrefix)
+		prefixedStore := ctx.MemStore(blockPrefix)
 		typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
+		defer typedStore.Commit()
 
 		val, err := db.Get([]byte("s/latest"))
 		if err != nil || val == nil {
@@ -354,11 +350,9 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 			nil,
 		)
 
-		app.SetWarmupMemStore(warmupCallback)
 		app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
-			ekv := ctx.MemStore()
 			// Separate prefix and typed functionality
-			prefixedStore := prefix.NewMemStore(ekv, blockPrefix)
+			prefixedStore := ctx.MemStore(blockPrefix)
 			typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
 
 			header := ctx.BlockHeader()
@@ -376,6 +370,23 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 		})
 
 		require.NoError(t, app.LoadLatestVersion())
+
+		memStoreManager := memstore.NewMemStoreManager()
+		app.CommitMultiStore().SetMemStoreManager(memStoreManager)
+		ctx := sdk.NewContext(
+			app.CommitMultiStore(),
+			cmtproto.Header{
+				ChainID: app.ChainID(),
+				Height:  app.LastBlockHeight(),
+			},
+			false,
+			log.NewNopLogger(),
+		)
+
+		warmupFunction(ctx)
+
+		memStoreManager.Commit(app.LastBlockHeight())
+
 		return app
 	}
 

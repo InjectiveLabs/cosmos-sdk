@@ -892,8 +892,6 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 		TxEvents: txEventSet,
 	}
 
-	fmt.Println("events in finalize block", events)
-
 	return &abci.FinalizeBlockResponse{
 		Events:                events,
 		TxResults:             txResults,

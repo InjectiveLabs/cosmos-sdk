@@ -91,13 +91,13 @@ func TestPublishEvent_FinalizeBlock_WithBeginAndEndBlocker(t *testing.T) {
 	})
 
 	_, err := app.InitChain(
-		&abci.RequestInitChain{
+		&abci.InitChainRequest{
 			InitialHeight: 1,
 		},
 	)
 	require.NoError(t, err)
 
-	res, err := app.FinalizeBlock(&abci.RequestFinalizeBlock{Height: 1})
+	res, err := app.FinalizeBlock(&abci.FinalizeBlockRequest{Height: 1})
 	require.NoError(t, err)
 
 	require.Len(t, res.Events, 2)
@@ -141,7 +141,7 @@ func TestPublishEvent_FinalizeBlock_DeliverTx(t *testing.T) {
 	suite := NewBaseAppSuite(t, anteOpt)
 	publishEventChan := getStreamEventFlushChan(suite.baseApp)
 
-	_, err := suite.baseApp.InitChain(&abci.RequestInitChain{
+	_, err := suite.baseApp.InitChain(&abci.InitChainRequest{
 		ConsensusParams: &cmtproto.ConsensusParams{},
 	})
 	require.NoError(t, err)
@@ -167,7 +167,7 @@ func TestPublishEvent_FinalizeBlock_DeliverTx(t *testing.T) {
 			txs = append(txs, txBytes)
 		}
 
-		res, err := suite.baseApp.FinalizeBlock(&abci.RequestFinalizeBlock{
+		res, err := suite.baseApp.FinalizeBlock(&abci.FinalizeBlockRequest{
 			Height: int64(blockN) + 1,
 			Txs:    txs,
 		})

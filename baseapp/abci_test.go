@@ -224,7 +224,7 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 	app := baseapp.NewBaseApp(name, log.NewTestLogger(t), db, nil)
 
 	_, err := app.InitChain(
-		&abci.InitChainRequest{
+		&abci.RequestInitChain{
 			InitialHeight: 3,
 		},
 	)
@@ -279,7 +279,7 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 		return sdk.EndBlock{}, nil
 	})
 
-	_, err = app.FinalizeBlock(&abci.FinalizeBlockRequest{Height: 3})
+	_, err = app.FinalizeBlock(&abci.RequestFinalizeBlock{Height: 3})
 	require.NoError(t, err)
 
 	cms := app.CommitMultiStore()
@@ -391,7 +391,7 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 	}
 
 	nextBlock := func(app *baseapp.BaseApp) {
-		_, err := app.FinalizeBlock(&abci.FinalizeBlockRequest{
+		_, err := app.FinalizeBlock(&abci.RequestFinalizeBlock{
 			Height: app.LastBlockHeight() + 1,
 		})
 		require.NoError(t, err)
@@ -401,7 +401,7 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 	}
 
 	app := newApp(db)
-	_, err := app.InitChain(&abci.InitChainRequest{
+	_, err := app.InitChain(&abci.RequestInitChain{
 		InitialHeight: 1,
 	})
 	require.NoError(t, err)

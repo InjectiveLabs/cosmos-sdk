@@ -12,6 +12,7 @@ import (
 	"cosmossdk.io/core/header"
 	"cosmossdk.io/log"
 	"cosmossdk.io/store/gaskv"
+	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
 )
 
@@ -349,8 +350,8 @@ func (c Context) KVStore(key storetypes.StoreKey) storetypes.KVStore {
 	return gaskv.NewStore(c.ms.GetKVStore(key), c.gasMeter, c.kvGasConfig)
 }
 
-func (c Context) MemStore() storetypes.MemStore {
-	return c.ms.GetMemStore()
+func (c Context) MemStore(key []byte) storetypes.MemStore {
+	return prefix.NewMemStore(c.ms.GetMemStore(), key)
 }
 
 // TransientStore fetches a TransientStore from the MultiStore.

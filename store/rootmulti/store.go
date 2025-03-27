@@ -79,7 +79,6 @@ type Store struct {
 	commitSync          bool
 
 	memStoreManager types.MemStoreManager
-	warmupMemStore  []func(func(types.StoreKey) types.KVStore, types.MemStore)
 }
 
 var (
@@ -150,8 +149,8 @@ func (rs *Store) SetIAVLDisableFastNode(disableFastNode bool) {
 	rs.iavlDisableFastNode = disableFastNode
 }
 
-func (rs *Store) SetWarmupMemStore(f ...func(func(types.StoreKey) types.KVStore, types.MemStore)) {
-	rs.warmupMemStore = f
+func (rs *Store) SetMemStoreManager(memStoreManager types.MemStoreManager) {
+	rs.memStoreManager = memStoreManager
 }
 
 func (rs *Store) SetSnapshotPoolLimit(limit int64) {
@@ -315,16 +314,6 @@ func (rs *Store) loadVersion(ver int64, upgrades *types.StoreUpgrades) error {
 
 	rs.lastCommitInfo = cInfo
 	rs.stores = newStores
-
-	if rs.warmupMemStore != nil {
-		memStore := rs.memStoreManager.Branch()
-		uncommittableMemStore := &memstore.UncommittableMemStore{MemStore: memStore}
-		for _, f := range rs.warmupMemStore {
-			f(rs.GetKVStore, uncommittableMemStore)
-		}
-		memStore.Commit()
-		rs.memStoreManager.Commit(ver)
-	}
 
 	// load any snapshot heights we missed from disk to be pruned on the next run
 	if err := rs.pruningManager.LoadSnapshotHeights(rs.db); err != nil {
@@ -672,13 +661,7 @@ func (rs *Store) CacheMultiStoreWithVersion(version int64) (types.CacheMultiStor
 
 	memStoreSnapshot, exists := rs.memStoreManager.GetSnapshotBranch(version)
 	if !exists {
-		if rs.warmupMemStore == nil {
-			// NOTE: temporary fallback for testing
-			memStore := rs.memStoreManager.Branch()
-			memStoreSnapshot = memStore
-		} else {
-			return nil, fmt.Errorf("no memstore snapshot found for version %d", version)
-		}
+		memStoreSnapshot = memstore.NewUnusableMemstore(version)
 	}
 
 	return cachemulti.NewStore(

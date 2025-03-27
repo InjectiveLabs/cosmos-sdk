@@ -372,9 +372,13 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 		require.NoError(t, app.LoadLatestVersion())
 
 		memStoreManager := memstore.NewMemStoreManager()
-		app.CommitMultiStore().SetMemStoreManager(memStoreManager)
+		cms := app.CommitMultiStore()
+		cms.SetMemStoreManager(memStoreManager)
+
+		cacheMulti := cms.CacheMultiStore()
+
 		ctx := sdk.NewContext(
-			app.CommitMultiStore(),
+			cacheMulti,
 			cmtproto.Header{
 				ChainID: app.ChainID(),
 				Height:  app.LastBlockHeight(),
@@ -384,7 +388,7 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 		)
 
 		warmupFunction(ctx)
-
+		cacheMulti.Write()
 		memStoreManager.Commit(app.LastBlockHeight())
 
 		return app

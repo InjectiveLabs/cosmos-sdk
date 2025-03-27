@@ -70,7 +70,7 @@ func (bt BTree) ReverseIterator(start, end []byte) (TypedMemIterator[any], error
 // Copy the tree. This is a copy-on-write operation and is very fast because
 // it only performs a shadowed copy.
 func (bt BTree) Copy() *BTree {
-	// NOTE(ephemeral): copyLock is necessary because the tree copying code modifies its own isoId.
+	// NOTE: copyLock is necessary because the tree copying code modifies its own isoId.
 	bt.copyLock.Lock()
 	tree := bt.tree.Copy()
 	bt.copyLock.Unlock()

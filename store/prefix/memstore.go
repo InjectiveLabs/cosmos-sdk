@@ -4,69 +4,69 @@ import (
 	"bytes"
 	"errors"
 
+	"cosmossdk.io/store/memstore"
 	"cosmossdk.io/store/types"
 )
 
-// typedPrefixMemStore integrates prefix functionality with type support
-type typedPrefixMemStore[T any] struct {
+// prefixMemStore integrates prefix functionality
+type prefixMemStore struct {
 	parent types.MemStore
 	prefix []byte
 }
 
-// NewMemStore creates a prefix memory store that supports generic type T
-func NewMemStore[T any](parent types.MemStore, prefix []byte) types.TypedPrefixMemStore[T] {
-	return &typedPrefixMemStore[T]{
+// NewTypedMemStore creates a prefix memory store that supports generic type T
+func NewTypedMemStore[T any](ms types.MemStore, prefix []byte) types.TypedMemStore[T] {
+	prefixed := NewMemStore(ms, prefix)
+	return memstore.NewTypedMemStore[T](prefixed)
+}
+
+// NewMemStore creates a prefix memory store
+func NewMemStore(parent types.MemStore, prefix []byte) types.MemStore {
+	return &prefixMemStore{
 		parent: parent,
 		prefix: prefix,
 	}
 }
 
 // key prefixes the given key with the store's prefix
-func (b *typedPrefixMemStore[T]) key(key []byte) (res []byte) {
+func (b *prefixMemStore) key(key []byte) (res []byte) {
 	if key == nil {
-		panic("nil key on PrefixMemBatch")
+		panic("nil key on PrefixMemStore")
 	}
 	res = cloneAppend(b.prefix, key)
 	return
 }
 
-// Get retrieves a value for the given key as type T
-func (b *typedPrefixMemStore[T]) Get(key []byte) T {
-	value := b.parent.Get(b.key(key))
-	if value == nil {
-		var zero T
-		return zero
-	}
-
-	typedValue := value.(T)
-	return typedValue
+// Get retrieves a value for the given key
+func (b *prefixMemStore) Get(key []byte) interface{} {
+	return b.parent.Get(b.key(key))
 }
 
 // Set adds or updates a key-value pair
-func (b *typedPrefixMemStore[T]) Set(key []byte, value T) {
+func (b *prefixMemStore) Set(key []byte, value interface{}) {
 	b.parent.Set(b.key(key), value)
 }
 
 // Delete removes a key
-func (b *typedPrefixMemStore[T]) Delete(key []byte) {
+func (b *prefixMemStore) Delete(key []byte) {
 	b.parent.Delete(b.key(key))
 }
 
 // Commit applies the changes in the current batch
-func (b *typedPrefixMemStore[T]) Commit() {
+func (b *prefixMemStore) Commit() {
 	b.parent.Commit()
 }
 
 // Branch creates a nested branch
-func (b *typedPrefixMemStore[T]) Branch() types.TypedPrefixMemStore[T] {
-	return &typedPrefixMemStore[T]{
+func (b *prefixMemStore) Branch() types.MemStore {
+	return &prefixMemStore{
 		parent: b.parent.Branch(),
 		prefix: b.prefix,
 	}
 }
 
 // Iterator returns an iterator over the key-value pairs within the specified range
-func (b *typedPrefixMemStore[T]) Iterator(start, end []byte) types.TypedPrefixMemStoreIterator[T] {
+func (b *prefixMemStore) Iterator(start, end []byte) types.MemStoreIterator {
 	var newStart, newEnd []byte
 
 	if start == nil {
@@ -83,11 +83,11 @@ func (b *typedPrefixMemStore[T]) Iterator(start, end []byte) types.TypedPrefixMe
 
 	iter := b.parent.Iterator(newStart, newEnd)
 
-	return newTypedPrefixMemStoreIterator[T](b.prefix, start, end, iter)
+	return newPrefixMemStoreIterator(b.prefix, start, end, iter)
 }
 
 // ReverseIterator returns an iterator over the key-value pairs in reverse order
-func (b *typedPrefixMemStore[T]) ReverseIterator(start, end []byte) types.TypedPrefixMemStoreIterator[T] {
+func (b *prefixMemStore) ReverseIterator(start, end []byte) types.MemStoreIterator {
 	var newStart, newEnd []byte
 
 	if start == nil {
@@ -104,11 +104,11 @@ func (b *typedPrefixMemStore[T]) ReverseIterator(start, end []byte) types.TypedP
 
 	iter := b.parent.ReverseIterator(newStart, newEnd)
 
-	return newTypedPrefixMemStoreIterator[T](b.prefix, start, end, iter)
+	return newPrefixMemStoreIterator(b.prefix, start, end, iter)
 }
 
-// typedPrefixMemStoreIterator is an iterator that supports generic type T
-type typedPrefixMemStoreIterator[T any] struct {
+// prefixMemStoreIterator is an iterator with prefix support
+type prefixMemStoreIterator struct {
 	prefix []byte
 	start  []byte
 	end    []byte
@@ -116,10 +116,10 @@ type typedPrefixMemStoreIterator[T any] struct {
 	valid  bool
 }
 
-// newTypedPrefixMemStoreIterator creates a new typed prefix iterator
-func newTypedPrefixMemStoreIterator[T any](prefix, start, end []byte, parent types.MemStoreIterator) *typedPrefixMemStoreIterator[T] {
+// newPrefixMemStoreIterator creates a new prefix iterator
+func newPrefixMemStoreIterator(prefix, start, end []byte, parent types.MemStoreIterator) *prefixMemStoreIterator {
 	valid := parent.Valid() && bytes.HasPrefix(parent.Key(), prefix)
-	return &typedPrefixMemStoreIterator[T]{
+	return &prefixMemStoreIterator{
 		prefix: prefix,
 		start:  start,
 		end:    end,
@@ -129,17 +129,17 @@ func newTypedPrefixMemStoreIterator[T any](prefix, start, end []byte, parent typ
 }
 
 // Domain returns the start and end keys
-func (pi *typedPrefixMemStoreIterator[T]) Domain() ([]byte, []byte) {
+func (pi *prefixMemStoreIterator) Domain() ([]byte, []byte) {
 	return pi.start, pi.end
 }
 
 // Valid returns whether the iterator is positioned at a valid item
-func (pi *typedPrefixMemStoreIterator[T]) Valid() bool {
+func (pi *prefixMemStoreIterator) Valid() bool {
 	return pi.valid && pi.iter.Valid()
 }
 
 // Next moves to the next item
-func (pi *typedPrefixMemStoreIterator[T]) Next() {
+func (pi *prefixMemStoreIterator) Next() {
 	if !pi.valid {
 		panic("prefixIterator invalid, cannot call Next()")
 	}
@@ -151,7 +151,7 @@ func (pi *typedPrefixMemStoreIterator[T]) Next() {
 }
 
 // Key returns the current key with the prefix stripped
-func (pi *typedPrefixMemStoreIterator[T]) Key() []byte {
+func (pi *prefixMemStoreIterator) Key() []byte {
 	if !pi.valid {
 		panic("prefixIterator invalid, cannot call Key()")
 	}
@@ -160,24 +160,22 @@ func (pi *typedPrefixMemStoreIterator[T]) Key() []byte {
 	return stripPrefix(key, pi.prefix)
 }
 
-// Value returns the current value as type T
-func (pi *typedPrefixMemStoreIterator[T]) Value() T {
+// Value returns the current value
+func (pi *prefixMemStoreIterator) Value() interface{} {
 	if !pi.valid {
-		var zero T
-		return zero
+		return nil
 	}
 
-	value := pi.iter.Value()
-	return value.(T)
+	return pi.iter.Value()
 }
 
 // Close releases resources
-func (pi *typedPrefixMemStoreIterator[T]) Close() error {
+func (pi *prefixMemStoreIterator) Close() error {
 	return pi.iter.Close()
 }
 
 // Error returns an error if the iterator is invalid
-func (pi *typedPrefixMemStoreIterator[T]) Error() error {
+func (pi *prefixMemStoreIterator) Error() error {
 	if !pi.Valid() {
 		return errors.New("invalid prefixIterator")
 	}

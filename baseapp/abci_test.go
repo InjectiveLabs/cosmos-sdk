@@ -28,6 +28,7 @@ import (
 
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
+	"cosmossdk.io/store/memstore"
 	"cosmossdk.io/store/prefix"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 	"cosmossdk.io/store/snapshots"
@@ -223,7 +224,7 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 	app := baseapp.NewBaseApp(name, log.NewTestLogger(t), db, nil)
 
 	_, err := app.InitChain(
-		&abci.RequestInitChain{
+		&abci.InitChainRequest{
 			InitialHeight: 3,
 		},
 	)
@@ -232,12 +233,11 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 	blockPrefix := []byte{0x01}
 	app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
 		memStore := ctx.MemStore()
-		typedKV := prefix.NewMemStore[*cmtproto.Block](
-			memStore,
-			blockPrefix,
-		)
+		// Separate prefix and typed functionality
+		prefixedStore := prefix.NewMemStore(memStore, blockPrefix)
+		typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
 
-		typedKV.Set([]byte("block-1"), &cmtproto.Block{
+		typedStore.Set([]byte("block-1"), &cmtproto.Block{
 			Header: cmtproto.Header{Height: 1},
 		})
 
@@ -245,49 +245,54 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 		cacheCtx, _ := ctx.CacheContext()
 		{
 			memStore := cacheCtx.MemStore()
-			typedKV := prefix.
-				NewMemStore[*cmtproto.Block](memStore, blockPrefix)
+			// Separate prefix and typed functionality
+			prefixedStore := prefix.NewMemStore(memStore, blockPrefix)
+			typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
 
-			typedKV.Set([]byte("block-2"), &cmtproto.Block{
+			typedStore.Set([]byte("block-2"), &cmtproto.Block{
 				Header: cmtproto.Header{Height: 2},
 			})
 
-			block2 := typedKV.Get([]byte("block-2"))
+			block2 := typedStore.Get([]byte("block-2"))
 			require.Equal(t, block2.Header.Height, int64(2))
 		}
 
 		cacheCtx2, writeCache2 := ctx.CacheContext()
 		{
 			memStore := cacheCtx2.MemStore()
-			typedKV := prefix.
-				NewMemStore[*cmtproto.Block](memStore, blockPrefix)
+			// Separate prefix and typed functionality
+			prefixedStore := prefix.NewMemStore(memStore, blockPrefix)
+			typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
 
-			typedKV.Set([]byte("block-3"), &cmtproto.Block{
+			typedStore.Set([]byte("block-3"), &cmtproto.Block{
 				Header: cmtproto.Header{Height: 3},
 			})
 
-			block3 := typedKV.Get([]byte("block-3"))
+			block3 := typedStore.Get([]byte("block-3"))
 			require.Equal(t, block3.Header.Height, int64(3))
 		}
 		writeCache2()
 
-		block1 := typedKV.Get([]byte("block-1")) // from ctx
+		block1 := typedStore.Get([]byte("block-1")) // from ctx
 		require.Equal(t, block1.Header.Height, int64(1))
-		block2 := typedKV.Get([]byte("block-2")) // from cacheCtx
+		block2 := typedStore.Get([]byte("block-2")) // from cacheCtx
 		require.Nil(t, block2)
-		block3 := typedKV.Get([]byte("block-3"))
+		block3 := typedStore.Get([]byte("block-3"))
 		require.Equal(t, block3.Header.Height, int64(3))
 
 		return sdk.EndBlock{}, nil
 	})
 
-	_, err = app.FinalizeBlock(&abci.RequestFinalizeBlock{Height: 3})
+	_, err = app.FinalizeBlock(&abci.FinalizeBlockRequest{Height: 3})
 	require.NoError(t, err)
 
 	cms := app.CommitMultiStore()
 	memStore := cms.GetMemStore()
-	typedmemStore := prefix.NewMemStore[*cmtproto.Block](memStore, blockPrefix)
-	val := typedmemStore.Get([]byte("block-1"))
+	// Separate prefix and typed functionality
+	prefixedStore := prefix.NewMemStore(memStore, blockPrefix)
+	typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
+
+	val := typedStore.Get([]byte("block-1"))
 	require.Nil(t, val)
 
 	_, err = app.Commit()
@@ -296,15 +301,18 @@ func TestABCI_MemStoreCacheContextLifecycle(t *testing.T) {
 
 	// re-initialize after commit
 	memStore = cms.GetMemStore()
-	typedmemStore = prefix.NewMemStore[*cmtproto.Block](memStore, blockPrefix)
-	val = typedmemStore.Get([]byte("block-1"))
+	// Separate prefix and typed functionality
+	prefixedStore = prefix.NewMemStore(memStore, blockPrefix)
+	typedStore = memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
+
+	val = typedStore.Get([]byte("block-1"))
 	require.NotNil(t, val)
 	require.Equal(t, val.Header.Height, int64(1))
 
-	val = typedmemStore.Get([]byte("block-2"))
+	val = typedStore.Get([]byte("block-2"))
 	require.Nil(t, val)
 
-	val = typedmemStore.Get([]byte("block-3"))
+	val = typedStore.Get([]byte("block-3"))
 	require.NotNil(t, val)
 	require.Equal(t, val.Header.Height, int64(3))
 }
@@ -318,8 +326,9 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 		_ func(storetypes.StoreKey) storetypes.KVStore,
 		memStore storetypes.MemStore,
 	) {
-		typedKV := prefix.
-			NewMemStore[*cmtproto.Block](memStore, blockPrefix)
+		// Separate prefix and typed functionality
+		prefixedStore := prefix.NewMemStore(memStore, blockPrefix)
+		typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
 
 		val, err := db.Get([]byte("s/latest"))
 		if err != nil || val == nil {
@@ -333,7 +342,7 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 			block := &cmtproto.Block{
 				Header: cmtproto.Header{Height: i},
 			}
-			typedKV.Set([]byte(fmt.Sprintf("block-%d", i)), block)
+			typedStore.Set([]byte(fmt.Sprintf("block-%d", i)), block)
 		}
 	}
 
@@ -348,11 +357,12 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 		app.SetWarmupMemStore(warmupCallback)
 		app.SetEndBlocker(func(ctx sdk.Context) (sdk.EndBlock, error) {
 			ekv := ctx.MemStore()
-			typedKV := prefix.
-				NewMemStore[*cmtproto.Block](ekv, blockPrefix)
+			// Separate prefix and typed functionality
+			prefixedStore := prefix.NewMemStore(ekv, blockPrefix)
+			typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
 
 			header := ctx.BlockHeader()
-			typedKV.Set(
+			typedStore.Set(
 				[]byte(
 					fmt.Sprintf("block-%d", header.Height),
 				),
@@ -370,7 +380,7 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 	}
 
 	nextBlock := func(app *baseapp.BaseApp) {
-		_, err := app.FinalizeBlock(&abci.RequestFinalizeBlock{
+		_, err := app.FinalizeBlock(&abci.FinalizeBlockRequest{
 			Height: app.LastBlockHeight() + 1,
 		})
 		require.NoError(t, err)
@@ -380,7 +390,7 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 	}
 
 	app := newApp(db)
-	_, err := app.InitChain(&abci.RequestInitChain{
+	_, err := app.InitChain(&abci.InitChainRequest{
 		InitialHeight: 1,
 	})
 	require.NoError(t, err)
@@ -396,7 +406,8 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 	{
 		cms := app.CommitMultiStore()
 		ekv := cms.GetMemStore()
-		typedEkv := prefix.NewMemStore[*cmtproto.Block](ekv, blockPrefix)
+		prefixedStore := prefix.NewMemStore(ekv, blockPrefix)
+		typedEkv := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
 		iter := typedEkv.Iterator(nil, nil)
 		for ; iter.Valid(); iter.Next() {
 			memStoreSnapshot = append(memStoreSnapshot, struct {
@@ -415,7 +426,8 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 	{ // check memStore snapshot
 		cms := app2.CommitMultiStore()
 		ekv := cms.GetMemStore()
-		typedEkv := prefix.NewMemStore[*cmtproto.Block](ekv, blockPrefix)
+		prefixedStore := prefix.NewMemStore(ekv, blockPrefix)
+		typedEkv := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
 		for _, kv := range memStoreSnapshot {
 			val := typedEkv.Get(kv.key)
 			require.Equal(t, kv.value, val)

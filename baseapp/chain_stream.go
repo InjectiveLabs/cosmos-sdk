@@ -1,8 +1,9 @@
 package baseapp
 
 import (
-	abci "github.com/cometbft/cometbft/abci/types"
 	"time"
+
+	abci "github.com/cometbft/cometbft/abci/types"
 )
 
 type StreamEvents struct {

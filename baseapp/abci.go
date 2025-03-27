@@ -711,6 +711,8 @@ func (app *BaseApp) VerifyVoteExtension(req *abci.VerifyVoteExtensionRequest) (r
 // must be used.
 func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.FinalizeBlockRequest) (*abci.FinalizeBlockResponse, error) {
 	var events []abci.Event
+	var publishEvents sdk.PublishEvents
+	var txEventSet []EventSet
 
 	if err := app.checkHalt(req.Height, req.Time); err != nil {
 		return nil, err
@@ -803,6 +805,7 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 		// continue
 	}
 
+	publishEvents = append(publishEvents, app.finalizeBlockState.Context().PublishEventManager().Events()...)
 	events = append(events, beginBlock.Events...)
 
 	// Reset the gas meter so that the AnteHandlers aren't required to
@@ -817,6 +820,8 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 	txResults := make([]*abci.ExecTxResult, 0, len(req.Txs))
 	for _, rawTx := range req.Txs {
 		var response *abci.ExecTxResult
+
+		app.finalizeBlockState.SetContext(app.finalizeBlockState.Context().WithPublishEventManager(sdk.NewPublishEventManager()))
 
 		if _, err := app.txDecoder(rawTx); err == nil {
 			response = app.deliverTx(rawTx)
@@ -841,12 +846,21 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 			// continue
 		}
 
+		filtered, order := filterOutPublishEvents(response.Events)
+		response.Events = filtered
 		txResults = append(txResults, response)
+		txEventSet = append(txEventSet, EventSet{
+			AbciEvents:    response.Events,
+			PublishEvents: app.finalizeBlockState.Context().PublishEventManager().Events(),
+			TrueOrder:     order,
+		})
 	}
 
 	if app.finalizeBlockState.ms.TracingEnabled() {
 		app.finalizeBlockState.ms = app.finalizeBlockState.ms.SetTracingContext(nil).(storetypes.CacheMultiStore)
 	}
+
+	app.finalizeBlockState.SetContext(app.finalizeBlockState.Context().WithPublishEventManager(sdk.NewPublishEventManager()))
 
 	endBlock, err := app.endBlock(app.finalizeBlockState.Context())
 	if err != nil {
@@ -861,8 +875,22 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 		// continue
 	}
 
+	publishEvents = append(publishEvents, app.finalizeBlockState.Context().PublishEventManager().Events()...)
+
 	events = append(events, endBlock.Events...)
 	cp := app.GetConsensusParams(app.finalizeBlockState.Context())
+
+	events, trueOrder := filterOutPublishEvents(events)
+	app.flushData = PublishEventFlush{
+		Height:      header.Height,
+		PrevAppHash: header.AppHash,
+		BlockEvents: EventSet{
+			AbciEvents:    events,
+			PublishEvents: publishEvents,
+			TrueOrder:     trueOrder,
+		},
+		TxEvents: txEventSet,
+	}
 
 	return &abci.FinalizeBlockResponse{
 		Events:                events,
@@ -870,6 +898,22 @@ func (app *BaseApp) internalFinalizeBlock(ctx context.Context, req *abci.Finaliz
 		ValidatorUpdates:      endBlock.ValidatorUpdates,
 		ConsensusParamUpdates: &cp,
 	}, nil
+}
+
+func filterOutPublishEvents(events []abci.Event) ([]abci.Event, []EventType) {
+	var filteredEvents []abci.Event
+	var trueOrder []EventType
+
+	for _, e := range events {
+		if e.Type == sdk.PlaceholderEventType {
+			trueOrder = append(trueOrder, EventTypePublish)
+			continue
+		}
+		filteredEvents = append(filteredEvents, e)
+		trueOrder = append(trueOrder, EventTypeAbci)
+	}
+
+	return filteredEvents, trueOrder
 }
 
 // FinalizeBlock will execute the block proposal provided by FinalizeBlockRequest.
@@ -959,7 +1003,10 @@ func (app *BaseApp) Commit() (*abci.CommitResponse, error) {
 		rms.SetCommitHeader(header)
 	}
 
-	app.cms.Commit()
+	commitId := app.cms.Commit()
+
+	app.flushData.NewAppHash = commitId.Hash
+	app.PublishBlockEvents(app.flushData)
 
 	resp := &abci.CommitResponse{
 		RetainHeight: retainHeight,

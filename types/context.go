@@ -59,6 +59,7 @@ type Context struct {
 	minGasPrice          DecCoins
 	consParams           cmtproto.ConsensusParams
 	eventManager         EventManagerI
+	publishEventManager  PublishEventManagerI
 	priority             int64 // The tx priority, only relevant in CheckTx
 	kvGasConfig          storetypes.GasConfig
 	transientKVGasConfig storetypes.GasConfig
@@ -71,22 +72,25 @@ type Context struct {
 type Request = Context
 
 // Read-only accessors
-func (c Context) Context() context.Context                      { return c.baseCtx }
-func (c Context) MultiStore() storetypes.MultiStore             { return c.ms }
-func (c Context) BlockHeight() int64                            { return c.header.Height }
-func (c Context) BlockTime() time.Time                          { return c.header.Time }
-func (c Context) ChainID() string                               { return c.chainID }
-func (c Context) TxBytes() []byte                               { return c.txBytes }
-func (c Context) Logger() log.Logger                            { return c.logger }
-func (c Context) VoteInfos() []abci.VoteInfo                    { return c.voteInfo }
-func (c Context) GasMeter() storetypes.GasMeter                 { return c.gasMeter }
-func (c Context) BlockGasMeter() storetypes.GasMeter            { return c.blockGasMeter }
-func (c Context) IsCheckTx() bool                               { return c.checkTx }
-func (c Context) IsReCheckTx() bool                             { return c.recheckTx }
-func (c Context) IsSigverifyTx() bool                           { return c.sigverifyTx }
-func (c Context) ExecMode() ExecMode                            { return c.execMode }
-func (c Context) MinGasPrices() DecCoins                        { return c.minGasPrice }
-func (c Context) EventManager() EventManagerI                   { return c.eventManager }
+func (c Context) Context() context.Context           { return c.baseCtx }
+func (c Context) MultiStore() storetypes.MultiStore  { return c.ms }
+func (c Context) BlockHeight() int64                 { return c.header.Height }
+func (c Context) BlockTime() time.Time               { return c.header.Time }
+func (c Context) ChainID() string                    { return c.chainID }
+func (c Context) TxBytes() []byte                    { return c.txBytes }
+func (c Context) Logger() log.Logger                 { return c.logger }
+func (c Context) VoteInfos() []abci.VoteInfo         { return c.voteInfo }
+func (c Context) GasMeter() storetypes.GasMeter      { return c.gasMeter }
+func (c Context) BlockGasMeter() storetypes.GasMeter { return c.blockGasMeter }
+func (c Context) IsCheckTx() bool                    { return c.checkTx }
+func (c Context) IsReCheckTx() bool                  { return c.recheckTx }
+func (c Context) IsSigverifyTx() bool                { return c.sigverifyTx }
+func (c Context) ExecMode() ExecMode                 { return c.execMode }
+func (c Context) MinGasPrices() DecCoins             { return c.minGasPrice }
+func (c Context) EventManager() EventManagerI        { return c.eventManager }
+func (c Context) PublishEventManager() PublishEventManagerI {
+	return &EventPlaceholderManager{c.eventManager, c.publishEventManager}
+}
 func (c Context) Priority() int64                               { return c.priority }
 func (c Context) KVGasConfig() storetypes.GasConfig             { return c.kvGasConfig }
 func (c Context) TransientKVGasConfig() storetypes.GasConfig    { return c.transientKVGasConfig }
@@ -138,6 +142,7 @@ func NewContext(ms storetypes.MultiStore, header cmtproto.Header, isCheckTx bool
 		gasMeter:             storetypes.NewInfiniteGasMeter(),
 		minGasPrice:          DecCoins{},
 		eventManager:         NewEventManager(),
+		publishEventManager:  NewPublishEventManager(),
 		kvGasConfig:          storetypes.KVGasConfig(),
 		transientKVGasConfig: storetypes.TransientGasConfig(),
 	}
@@ -293,6 +298,11 @@ func (c Context) WithEventManager(em EventManagerI) Context {
 	return c
 }
 
+func (c Context) WithPublishEventManager(sem PublishEventManagerI) Context {
+	c.publishEventManager = sem
+	return c
+}
+
 // WithPriority returns a Context with an updated tx priority
 func (c Context) WithPriority(p int64) Context {
 	c.priority = p
@@ -357,10 +367,19 @@ func (c Context) TransientStore(key storetypes.StoreKey) storetypes.KVStore {
 // EventManager when the caller executes the write.
 func (c Context) CacheContext() (cc Context, writeCache func()) {
 	cms := c.ms.CacheMultiStore()
-	cc = c.WithMultiStore(cms).WithEventManager(NewEventManager())
+	cc = c.WithMultiStore(cms).WithEventManager(NewEventManager()).WithPublishEventManager(NewPublishEventManager())
 
 	writeCache = func() {
 		c.EventManager().EmitEvents(cc.EventManager().Events())
+
+		pem := c.PublishEventManager()
+		// EventPlaceholderManager already emitted event placeholders to the EventManager
+		// so we do not emit them again by unwrapping it.
+		if pem.(*EventPlaceholderManager) != nil {
+			pem = pem.(*EventPlaceholderManager).publishEventManager
+		}
+		pem.EmitEvents(cc.PublishEventManager().Events())
+
 		cms.Write()
 	}
 

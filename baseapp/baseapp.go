@@ -205,6 +205,10 @@ type BaseApp struct {
 	EnableStreamer bool
 	StreamEvents   chan StreamEvents
 
+	EnablePublish bool
+	PublishEvents chan PublishEventFlush
+	flushData     PublishEventFlush
+
 	traceFlightRecorder *metrics.TraceRecorder
 }
 
@@ -227,6 +231,7 @@ func NewBaseApp(
 		sigverifyTx:      true,
 		queryGasLimit:    math.MaxUint64,
 		StreamEvents:     make(chan StreamEvents),
+		PublishEvents:    make(chan PublishEventFlush),
 	}
 
 	for _, option := range options {

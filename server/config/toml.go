@@ -234,6 +234,18 @@ plugin = "{{ .Streaming.ABCI.Plugin }}"
 # stop-node-on-err specifies whether to stop the node on message delivery error.
 stop-node-on-err = {{ .Streaming.ABCI.StopNodeOnErr }}
 
+# streaming.mqpub specifies the configuration for the MessageQueue publish service.
+[streaming.mqpub]
+
+# enable defines if the message queue publish service should be enabled.
+enabled = {{ .Streaming.MQPub.Enabled }}
+
+# seed-brokers defines where to be connected when the message gets published.
+seed-brokers = [{{ range .Streaming.MQPub.SeedBrokers }}{{ printf "%q, " . }}{{end}}]
+
+# topic-name defines the to be connected when message gets published.
+topic-name = "{{ .Streaming.MQPub.TopicName }}"
+
 ###############################################################################
 ###                         Mempool                                         ###
 ###############################################################################

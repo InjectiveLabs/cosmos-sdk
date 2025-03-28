@@ -324,7 +324,6 @@ func TestABCI_MemStoreWarmpup(t *testing.T) {
 		// Separate prefix and typed functionality
 		prefixedStore := ctx.MemStore(blockPrefix)
 		typedStore := memstore.NewTypedMemStore[*cmtproto.Block](prefixedStore)
-		defer typedStore.Commit()
 
 		val, err := db.Get([]byte("s/latest"))
 		if err != nil || val == nil {

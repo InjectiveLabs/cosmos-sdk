@@ -73,6 +73,7 @@ type BaseApp struct {
 	db                dbm.DB                      // common DB backend
 	cms               storetypes.CommitMultiStore // Main (uncached) state
 	qms               storetypes.MultiStore       // Optional alternative multistore for querying only.
+	mtx               sync.RWMutex                // global ABCI mutex to handle concurrency in app (after switching to Comet unsync ABCI client)
 	storeLoader       StoreLoader                 // function to handle store loading, may be overridden with SetStoreLoader()
 	grpcQueryRouter   *GRPCQueryRouter            // router for redirecting gRPC query calls
 	msgServiceRouter  *MsgServiceRouter           // router for redirecting Msg service messages

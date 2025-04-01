@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/InjectiveLabs/metrics"
 	"github.com/cockroachdb/errors"
@@ -59,6 +60,7 @@ const (
 	execModeFinalize                            // Finalize a block proposal
 
 	DoNotFailFastSendContextKey contextKeyT = "DoNotFailFast"
+	AnteMutexes                 contextKeyT = "AnteMutexes"
 )
 
 var _ servertypes.ABCI = (*BaseApp)(nil)
@@ -505,7 +507,7 @@ func (app *BaseApp) setState(mode execMode, h cmtproto.Header) {
 
 	switch mode {
 	case execModeCheck:
-		baseState.SetContext(baseState.Context().WithIsCheckTx(true).WithMinGasPrices(app.minGasPrices))
+		baseState.SetContext(baseState.Context().WithIsCheckTx(true).WithMinGasPrices(app.minGasPrices).WithValue(AnteMutexes, &sync.Map{}))
 		app.checkState = baseState
 
 	case execModePrepareProposal:
@@ -915,13 +917,12 @@ func (app *BaseApp) runTx(mode execMode, txBytes []byte) (gInfo sdk.GasInfo, res
 		)
 
 		// Branch context before AnteHandler call in case it aborts.
-		// This is required for both CheckTx and DeliverTx.
-		// Ref: https://github.com/cosmos/cosmos-sdk/issues/2772
-		//
-		// NOTE: Alternatively, we could require that AnteHandler ensures that
-		// writes do not happen if aborted/failed.  This may have some
-		// performance benefits, but it'll be more difficult to get right.
-		anteCtx, msCache = app.cacheTxContext(ctx, txBytes)
+		// This is required for DeliverTx, while CheckTx will handle branching iby itself nside ante handlers
+		if mode != execModeCheck && mode != execModeReCheck {
+			anteCtx, msCache = app.cacheTxContext(ctx, txBytes)
+		} else {
+			anteCtx = ctx
+		}
 		anteCtx = anteCtx.WithEventManager(sdk.NewEventManager())
 		newCtx, err := app.anteHandler(anteCtx, tx, mode == execModeSimulate)
 
@@ -949,8 +950,9 @@ func (app *BaseApp) runTx(mode execMode, txBytes []byte) (gInfo sdk.GasInfo, res
 			}
 			return gInfo, nil, nil, err
 		}
-
-		msCache.Write()
+		if msCache != nil { // nil in CheckTx and RecheckTx
+			msCache.Write()
+		}
 		anteEvents = events.ToABCIEvents()
 	}
 

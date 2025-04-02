@@ -129,6 +129,10 @@ func DisableBlockGasMeter() func(*BaseApp) {
 	return func(app *BaseApp) { app.SetDisableBlockGasMeter(true) }
 }
 
+func SetupSnapshotPoolLimit(limit int64) func(*BaseApp) {
+	return func(app *BaseApp) { app.SetSnapshotPoolLimit(limit) }
+}
+
 func (app *BaseApp) SetName(name string) {
 	if app.sealed {
 		panic("SetName() on sealed BaseApp")
@@ -406,4 +410,12 @@ func (app *BaseApp) SetMsgServiceRouter(msgServiceRouter *MsgServiceRouter) {
 // SetGRPCQueryRouter sets the GRPCQueryRouter of the BaseApp.
 func (app *BaseApp) SetGRPCQueryRouter(grpcQueryRouter *GRPCQueryRouter) {
 	app.grpcQueryRouter = grpcQueryRouter
+}
+
+func (app *BaseApp) SetSnapshotPoolLimit(limit int64) {
+	if app.sealed {
+		panic("SetSnapshotPoolLimit() on sealed BaseApp")
+	}
+
+	app.cms.SetSnapshotPoolLimit(limit)
 }

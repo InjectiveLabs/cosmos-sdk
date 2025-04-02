@@ -9,6 +9,7 @@ import (
 	"cosmossdk.io/store/metrics"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 	snapshottypes "cosmossdk.io/store/snapshots/types"
+	"cosmossdk.io/store/types"
 	storetypes "cosmossdk.io/store/types"
 )
 
@@ -16,6 +17,18 @@ var _ storetypes.MultiStore = multiStore{}
 
 type multiStore struct {
 	kv map[storetypes.StoreKey]kvStore
+}
+
+func (ms multiStore) SetMemStoreManager(types.MemStoreManager) {
+	panic("not implemented")
+}
+
+func (ms multiStore) SetSnapshotPoolLimit(int64) {
+	panic("not implemented")
+}
+
+func (ms multiStore) GetMemStore() types.MemStore {
+	panic("not implemented")
 }
 
 func (ms multiStore) CacheMultiStore() storetypes.CacheMultiStore {

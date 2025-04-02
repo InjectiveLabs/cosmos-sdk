@@ -191,12 +191,19 @@ require (
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
+// Here are the short-lived replace from the Cosmos SDK
+// Replace here are pending PRs, or version to be tagged
+// replace (
+// 	<temporary replace>
+// )
+replace cosmossdk.io/store => ./store
+
 replace cosmossdk.io/api => ./api
 
 // Below are the long-lived replace of the Cosmos SDK
 replace (
-	// Import the store module from the v0.50.x-store-comet1-inj branch
-	cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v1.1.1-0.20250317140226-272ef0ccbb2e
+	// TODO: enable
+	// cosmossdk.io/store => github.com/InjectiveLabs/cosmos-sdk/store v1.1.1-0.20240522173845-46ef88f66790
 	cosmossdk.io/x/evidence => ./x/evidence
 	cosmossdk.io/x/feegrant => ./x/feegrant
 	cosmossdk.io/x/upgrade => ./x/upgrade
@@ -214,6 +221,9 @@ replace (
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
 	// replace broken goleveldb
 	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
+
+	// replace tidwall/btree
+	github.com/tidwall/btree => github.com/InjectiveLabs/btree v0.0.0-20250402045845-4690b506608a
 )
 
 retract (

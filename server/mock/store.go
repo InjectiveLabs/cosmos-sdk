@@ -12,7 +12,7 @@ import (
 	storetypes "cosmossdk.io/store/types"
 )
 
-var _ storetypes.MultiStore = multiStore{}
+var _ storetypes.CommitMultiStore = multiStore{}
 
 type multiStore struct {
 	kv map[storetypes.StoreKey]kvStore
@@ -27,14 +27,6 @@ func (ms multiStore) CacheMultiStoreWithVersion(_ int64) (storetypes.CacheMultiS
 }
 
 func (ms multiStore) CacheWrap() storetypes.CacheWrap {
-	panic("not implemented")
-}
-
-func (ms multiStore) CacheWrapWithTrace(_ io.Writer, _ storetypes.TraceContext) storetypes.CacheWrap {
-	panic("not implemented")
-}
-
-func (ms multiStore) CacheWrapWithListeners(_ storetypes.StoreKey, _ []storetypes.MemoryListener) storetypes.CacheWrap {
 	panic("not implemented")
 }
 
@@ -114,6 +106,10 @@ func (ms multiStore) GetKVStore(key storetypes.StoreKey) storetypes.KVStore {
 	return ms.kv[key]
 }
 
+func (ms multiStore) GetObjKVStore(storetypes.StoreKey) storetypes.ObjKVStore {
+	panic("not implemented")
+}
+
 func (ms multiStore) GetStore(key storetypes.StoreKey) storetypes.Store {
 	panic("not implemented")
 }
@@ -183,14 +179,6 @@ type kvStore struct {
 }
 
 func (kv kvStore) CacheWrap() storetypes.CacheWrap {
-	panic("not implemented")
-}
-
-func (kv kvStore) CacheWrapWithTrace(w io.Writer, tc storetypes.TraceContext) storetypes.CacheWrap {
-	panic("not implemented")
-}
-
-func (kv kvStore) CacheWrapWithListeners(_ storetypes.StoreKey, _ []storetypes.MemoryListener) storetypes.CacheWrap {
 	panic("not implemented")
 }
 

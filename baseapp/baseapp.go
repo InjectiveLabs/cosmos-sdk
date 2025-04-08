@@ -917,13 +917,16 @@ func (app *BaseApp) runTx(mode execMode, txBytes []byte) (gInfo sdk.GasInfo, res
 			msCache storetypes.CacheMultiStore
 		)
 
-		// Branch context before AnteHandler call in case it aborts.
-		// This is required for DeliverTx, while CheckTx will handle branching iby itself nside ante handlers
-		if mode != execModeCheck && mode != execModeReCheck {
-			anteCtx, msCache = app.cacheTxContext(ctx, txBytes)
-		} else {
+		// For DeliverTx, branch context before AnteHandler call in case it aborts.
+		// CheckTx/RecheckTx will handle branching by itself inside ante handlers.
+		// Simulation already operates on branched context (see getContextForTx), so its ante handlers do not branch further.
+		isCheckOrRecheckTx := mode == execModeCheck || mode == execModeReCheck || mode == execModeSimulate
+		if isCheckOrRecheckTx {
 			anteCtx = ctx
+		} else {
+			anteCtx, msCache = app.cacheTxContext(ctx, txBytes)
 		}
+
 		anteCtx = anteCtx.WithEventManager(sdk.NewEventManager())
 		newCtx, err := app.anteHandler(anteCtx, tx, mode == execModeSimulate)
 
@@ -951,7 +954,7 @@ func (app *BaseApp) runTx(mode execMode, txBytes []byte) (gInfo sdk.GasInfo, res
 			}
 			return gInfo, nil, nil, err
 		}
-		if msCache != nil { // nil in CheckTx and RecheckTx
+		if msCache != nil { // nil in CheckTx, RecheckTx and Simulate
 			msCache.Write()
 		}
 		anteEvents = events.ToABCIEvents()

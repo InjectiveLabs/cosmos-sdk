@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/InjectiveLabs/metrics"
 	"github.com/cockroachdb/errors"
@@ -59,6 +60,7 @@ const (
 	execModeFinalize                            // Finalize a block proposal
 
 	DoNotFailFastSendContextKey contextKeyT = "DoNotFailFast"
+	AnteMutexes                 contextKeyT = "AnteMutexes"
 )
 
 var _ servertypes.ABCI = (*BaseApp)(nil)
@@ -71,6 +73,7 @@ type BaseApp struct {
 	db                dbm.DB                      // common DB backend
 	cms               storetypes.CommitMultiStore // Main (uncached) state
 	qms               storetypes.MultiStore       // Optional alternative multistore for querying only.
+	mtx               sync.RWMutex                // global ABCI mutex to handle concurrency in app (after switching to Comet unsync ABCI client)
 	storeLoader       StoreLoader                 // function to handle store loading, may be overridden with SetStoreLoader()
 	grpcQueryRouter   *GRPCQueryRouter            // router for redirecting gRPC query calls
 	msgServiceRouter  *MsgServiceRouter           // router for redirecting Msg service messages
@@ -505,7 +508,7 @@ func (app *BaseApp) setState(mode execMode, h cmtproto.Header) {
 
 	switch mode {
 	case execModeCheck:
-		baseState.SetContext(baseState.Context().WithIsCheckTx(true).WithMinGasPrices(app.minGasPrices))
+		baseState.SetContext(baseState.Context().WithIsCheckTx(true).WithMinGasPrices(app.minGasPrices).WithValue(AnteMutexes, &sync.Map{}))
 		app.checkState = baseState
 
 	case execModePrepareProposal:
@@ -914,14 +917,16 @@ func (app *BaseApp) runTx(mode execMode, txBytes []byte) (gInfo sdk.GasInfo, res
 			msCache storetypes.CacheMultiStore
 		)
 
-		// Branch context before AnteHandler call in case it aborts.
-		// This is required for both CheckTx and DeliverTx.
-		// Ref: https://github.com/cosmos/cosmos-sdk/issues/2772
-		//
-		// NOTE: Alternatively, we could require that AnteHandler ensures that
-		// writes do not happen if aborted/failed.  This may have some
-		// performance benefits, but it'll be more difficult to get right.
-		anteCtx, msCache = app.cacheTxContext(ctx, txBytes)
+		// For DeliverTx, branch context before AnteHandler call in case it aborts.
+		// CheckTx/RecheckTx will handle branching by itself inside ante handlers.
+		// Simulation already operates on branched context (see getContextForTx), so its ante handlers do not branch further.
+		isCheckOrRecheckTx := mode == execModeCheck || mode == execModeReCheck || mode == execModeSimulate
+		if isCheckOrRecheckTx {
+			anteCtx = ctx
+		} else {
+			anteCtx, msCache = app.cacheTxContext(ctx, txBytes)
+		}
+
 		anteCtx = anteCtx.WithEventManager(sdk.NewEventManager())
 		newCtx, err := app.anteHandler(anteCtx, tx, mode == execModeSimulate)
 
@@ -949,8 +954,9 @@ func (app *BaseApp) runTx(mode execMode, txBytes []byte) (gInfo sdk.GasInfo, res
 			}
 			return gInfo, nil, nil, err
 		}
-
-		msCache.Write()
+		if msCache != nil { // nil in CheckTx, RecheckTx and Simulate
+			msCache.Write()
+		}
 		anteEvents = events.ToABCIEvents()
 	}
 

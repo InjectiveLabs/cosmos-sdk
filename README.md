@@ -1,5 +1,5 @@
 <div align="center">
-  <h1> Cosmos SDK </h1>
+  <h1>Cosmos SDK</h1>
 </div>
 
 ![banner](docs/static/img/banner.jpg)

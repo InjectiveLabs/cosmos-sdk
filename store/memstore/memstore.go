@@ -45,7 +45,7 @@ type (
 
 		// base points to memStoreManager.base when the branch is created.
 		//
-		// If btreeStore.base differs from base at commit time, the commit fails and a panic occurs.
+		// If memstoreManager.base differs from base at commit time, the commit fails and a panic occurs.
 		base *btree
 
 		// manager is a reference to the parent memStoreManager, used by top-level branches to update the manager during commit.
@@ -224,9 +224,9 @@ func (b *memStore) Branch() types.MemStore {
 	// Here, current refers to the current level's -1 level branch:
 	//   -> If current is L3: points to L2's current
 	//   -> If current is L2: points to L1's current
-	//   -> If current is L1: points to btreeStore.current
+	//   -> If current is L1: points to memstoreManager.current
 	//
-	// newCurrent is a Copy()'d btreeStore.
+	// newCurrent is a Copy()'d memstoreManager.
 	newCurrent := b.current.Copy()
 
 	return &memStore{
@@ -247,7 +247,7 @@ func (b *memStore) Commit() {
 	}
 
 	if b.current != nil {
-		// top-level branch: swap *btreeStore.current
+		// top-level branch: swap *memstoreManager.current
 		if b.manager.base.Load() != b.base {
 			panic("commit failed: concurrent modification detected")
 		}

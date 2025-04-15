@@ -2,19 +2,43 @@ package types
 
 type (
 	// MemStoreManager defines the interface for a tree with batching capabilities.
+	//
+	// MemStoreManager defines the interface for managing the root (committed) state
+	// of an in-memory B-Tree store and provides branching capabilities.
+	// It ensures that only one top-level branch (L1 MemStore) can be successfully
+	// committed at a time to maintain consistency.
 	MemStoreManager interface {
-		// Branch creates a new MemStore that can be safely used from multiple goroutines.
+		// Branch creates a new top-level MemStore (L1) based on the latest committed
+		// state managed by the MemStoreManager.
 		//
-		// For convenience, we refer to this as a Level1 (L1) MemStore.
+		// Each L1 MemStore operates on a copy-on-write (CoW) snapshot of the
+		// manager's state at the time of branching, providing isolation. Multiple L1
+		// branches can be created and used concurrently for reads and writes within
+		// their respective instances.
 		//
-		// The L1 MemStore's current btree is created by copying (Copy()) a snapshot of tree.root.
-		// When L1 MemStore's Commit() is called, it replaces tree.root using atomic.CompareAndSwap().
+		// However, committing changes back requires synchronization. Only the *first*
+		// L1 MemStore to call Commit() successfully updates the manager's pending state.
+		// Subsequent attempts by other L1 branches (created from the *same* base state)
+		// to Commit() will fail (panic) due to concurrent modification detection.
 		Branch() MemStore
 
+		// GetSnapshotBranch retrieves a MemStore representing the state at a specific
+		// past height, if available in the snapshot pool.
+		// The returned MemStore provides a read-only view of that historical state
+		// and typically cannot be committed (often wrapped in an UncommittableMemStore).
+		// Returns the MemStore and true if found, otherwise nil and false.
 		GetSnapshotBranch(height int64) (MemStore, bool)
 
 		SetSnapshotPoolLimit(limit int64)
 
+		// Commit finalizes the pending changes (typically written by a single preceding
+		// successful L1 MemStore.Commit() call) into the manager's main state (root)
+		// at the specified height.
+		//
+		// This operation atomically updates the root pointer to reflect the new state
+		// and potentially creates a snapshot of this state at the given height,
+		// making it available via GetSnapshotBranch.
+		// Panics if height is negative.
 		Commit(height int64)
 	}
 
@@ -24,22 +48,28 @@ type (
 		Get(key []byte) any
 
 		// Iterator returns an iterator over the key-value pairs in the MemStore
-		// within the specified range.
+		// within the specified range [start, end).
 		//
-		// The iterator will include items with key >= start and key < end.
-		// If start is nil, it returns all items from the beginning.
-		// If end is nil, it returns all items until the end.
+		// IMPORTANT: The iterator operates on an immutable snapshot of the MemStore's
+		// state taken at the moment Iterator() is called. Subsequent modifications
+		// to the MemStore using Set() or Delete() will *not* be reflected in the
+		// existing iterator.
 		//
-		// If an error occurs during initialization, this method panics.
+		// The iterator includes items with key >= start and key < end.
+		// If start is nil, iteration starts from the first key.
+		// If end is nil, iteration continues to the last key.
+		// Panics if an error occurs during initialization (e.g., invalid range).
 		Iterator(start, end []byte) MemStoreIterator
 		// ReverseIterator returns an iterator over the key-value pairs in the MemStore
-		// within the specified range, in reverse order (from end to start).
+		// within the specified range [start, end), in reverse order.
 		//
-		// The iterator will include items with key >= start and key < end.
-		// If start is nil, it returns all items from the beginning.
-		// If end is nil, it returns all items until the end.
+		// IMPORTANT: Like Iterator(), this operates on an immutable snapshot of the
+		// MemStore's state at the time ReverseIterator() is called.
 		//
-		// If an error occurs during initialization, this method panics.
+		// The iterator includes items with key >= start and key < end.
+		// If start is nil, iteration starts from the last key.
+		// If end is nil, iteration continues to the first key.
+		// Panics if an error occurs during initialization (e.g., invalid range).
 		ReverseIterator(start, end []byte) MemStoreIterator
 	}
 
@@ -55,24 +85,37 @@ type (
 		// Changes are made to the Copy-on-Write btree of the current MemStore.
 		Delete(key []byte)
 
-		// Commit applies the changes in the current MemStore:
-		// - For nested MemStores, it updates the parent MemStore's current pointer.
-		// - For top-level MemStores, it updates tree.current and prepares for atomic swap during tree.Commit().
-		// - Commit() will panic if it fails.
-		//   Failure can occur if concurrent modification is detected.
-		//   We assume this case is handled by higher-level usecases.
+		// Commit applies the changes made within this MemStore.
+		//
+		// Behavior depends on whether it's a nested or top-level (L1) branch:
+		// - Nested Branches: Updates the parent MemStore's internal state pointer
+		//   to point to this branch's modified B-Tree. This operation itself is
+		//   *not* guaranteed to be atomic or thread-safe with respect to other
+		//   concurrent operations on the parent. Higher-level synchronization
+		//   is needed if the parent is accessed concurrently.
+		// - Top-Level (L1) Branches: Prepares the changes to be finalized by the
+		//   MemStoreManager. It checks if the underlying base state managed by the
+		//   MemStoreManager has changed since this L1 branch was created.
+		//   If the base state *has* changed (indicating another L1 branch from the
+		//   same base has already committed), this Commit() call will panic to
+		//   prevent lost updates (concurrent modification detected). If successful,
+		//   it updates the manager's *pending* state, which is then finalized by
+		//   calling MemStoreManager.Commit().
 		Commit()
 	}
 
 	// MemStore defines operations that can be performed on a memory store.
 	//
-	// The implementation of MemStore is not thread-safe.
+	// The implementation of MemStore is "not thread-safe".
 	// Therefore, when concurrent access is required, users should protect it
 	// using rwlock at the application level.
 	MemStore interface {
-		// Branch creates a nested MemStore on top of the current MemStore.
-		// It makes a copy (BTree.Copy()) of the current MemStore's btree to create an independent workspace.
-		// The parent field points to the current MemStore.
+		// Branch creates a nested MemStore (e.g., L2, L3) based on the current state
+		// of this MemStore (the parent).
+		// It uses a copy-on-write (CoW) snapshot of the parent's current B-Tree,
+		// allowing isolated modifications within the nested branch.
+		// Changes in the nested branch are not visible to the parent until Commit()
+		// is called on the nested branch.
 		Branch() MemStore
 
 		MemStoreReader
@@ -107,11 +150,21 @@ type (
 		Close() error
 	}
 
+	// SnapshotPool defines an interface for storing and retrieving historical
+	// versions (snapshots) of MemStoreManager states, typically keyed by block height.
+	// Implementations may enforce limits on the number of snapshots stored.
 	SnapshotPool interface {
+		// Get retrieves a MemStoreManager representing the state at a specific height.
+		// Returns the manager and true if found, otherwise nil and false.
 		Get(height int64) (MemStoreManager, bool)
 
+		// Set stores a MemStoreManager representing the state at a specific height.
+		// If a manager for this height already exists, it might be overwritten.
 		Set(height int64, store MemStoreManager)
 
+		// Limit sets the maximum number of snapshots the pool should retain.
+		// Implementations may use LRU or other strategies for pruning when the
+		// limit is exceeded.
 		Limit(length int64)
 	}
 

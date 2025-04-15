@@ -12,6 +12,7 @@ import (
 	"cosmossdk.io/core/header"
 	"cosmossdk.io/log"
 	"cosmossdk.io/store/gaskv"
+	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
 )
 
@@ -65,6 +66,9 @@ type Context struct {
 	streamingManager     storetypes.StreamingManager
 	cometInfo            comet.BlockInfo
 	headerInfo           header.Info
+
+	// extend Context with memstore branch
+	memStore storetypes.MemStore
 }
 
 // Proposed rename, not done to avoid API breakage
@@ -344,6 +348,10 @@ func (c Context) Value(key interface{}) interface{} {
 // KVStore fetches a KVStore from the MultiStore.
 func (c Context) KVStore(key storetypes.StoreKey) storetypes.KVStore {
 	return gaskv.NewStore(c.ms.GetKVStore(key), c.gasMeter, c.kvGasConfig)
+}
+
+func (c Context) MemStore(key []byte) storetypes.MemStore {
+	return prefix.NewMemStore(c.ms.GetMemStore(), key)
 }
 
 // TransientStore fetches a TransientStore from the MultiStore.

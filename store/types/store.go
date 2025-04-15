@@ -136,6 +136,7 @@ type MultiStore interface {
 	// If the store does not exist, panics.
 	GetStore(StoreKey) Store
 	GetKVStore(StoreKey) KVStore
+	GetMemStore() MemStore
 
 	// TracingEnabled returns if tracing is enabled for the MultiStore.
 	TracingEnabled() bool
@@ -209,6 +210,10 @@ type CommitMultiStore interface {
 
 	// SetIAVLDisableFastNode enables/disables fastnode feature on iavl.
 	SetIAVLDisableFastNode(disable bool)
+
+	SetMemStoreManager(memStore MemStoreManager)
+
+	SetSnapshotPoolLimit(limit int64)
 
 	// RollbackToVersion rollback the db to specific version(height).
 	RollbackToVersion(version int64) error

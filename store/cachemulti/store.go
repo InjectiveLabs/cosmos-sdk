@@ -24,9 +24,10 @@ const storeNameCtxKey = "store_name"
 // NOTE: a Store (and MultiStores in general) should never expose the
 // keys for the substores.
 type Store struct {
-	db     types.CacheKVStore
-	stores map[types.StoreKey]types.CacheWrap
-	keys   map[string]types.StoreKey
+	db       types.CacheKVStore
+	stores   map[types.StoreKey]types.CacheWrap
+	keys     map[string]types.StoreKey
+	memStore types.MemStore
 
 	traceWriter  io.Writer
 	traceContext types.TraceContext
@@ -40,11 +41,14 @@ var _ types.CacheMultiStore = Store{}
 func NewFromKVStore(
 	store types.KVStore, stores map[types.StoreKey]types.CacheWrapper,
 	keys map[string]types.StoreKey, traceWriter io.Writer, traceContext types.TraceContext,
+	memStore types.MemStore,
 ) Store {
 	cms := Store{
-		db:           cachekv.NewStore(store),
-		stores:       make(map[types.StoreKey]types.CacheWrap, len(stores)),
-		keys:         keys,
+		db:       cachekv.NewStore(store),
+		stores:   make(map[types.StoreKey]types.CacheWrap, len(stores)),
+		keys:     keys,
+		memStore: memStore,
+
 		traceWriter:  traceWriter,
 		traceContext: traceContext,
 	}
@@ -67,18 +71,25 @@ func NewFromKVStore(
 // CacheWrapper objects. Each CacheWrapper store is a branched store.
 func NewStore(
 	db dbm.DB, stores map[types.StoreKey]types.CacheWrapper, keys map[string]types.StoreKey,
-	traceWriter io.Writer, traceContext types.TraceContext,
+	traceWriter io.Writer, traceContext types.TraceContext, memStore types.MemStore,
 ) Store {
-	return NewFromKVStore(dbadapter.Store{DB: db}, stores, keys, traceWriter, traceContext)
+	return NewFromKVStore(dbadapter.Store{DB: db}, stores, keys, traceWriter, traceContext, memStore)
 }
 
-func newCacheMultiStoreFromCMS(cms Store) Store {
+func newCacheMultiStoreFromCMS(cms Store, memStore types.MemStore) Store {
 	stores := make(map[types.StoreKey]types.CacheWrapper)
 	for k, v := range cms.stores {
 		stores[k] = v
 	}
 
-	return NewFromKVStore(cms.db, stores, nil, cms.traceWriter, cms.traceContext)
+	return NewFromKVStore(
+		cms.db,
+		stores,
+		nil,
+		cms.traceWriter,
+		cms.traceContext,
+		memStore.Branch(),
+	)
 }
 
 // SetTracer sets the tracer for the MultiStore that the underlying
@@ -125,6 +136,8 @@ func (cms Store) Write() {
 	for _, store := range cms.stores {
 		store.Write()
 	}
+
+	cms.memStore.Commit()
 }
 
 // Implements CacheWrapper.
@@ -139,7 +152,7 @@ func (cms Store) CacheWrapWithTrace(_ io.Writer, _ types.TraceContext) types.Cac
 
 // Implements MultiStore.
 func (cms Store) CacheMultiStore() types.CacheMultiStore {
-	return newCacheMultiStoreFromCMS(cms)
+	return newCacheMultiStoreFromCMS(cms, cms.memStore)
 }
 
 // CacheMultiStoreWithVersion implements the MultiStore interface. It will panic
@@ -167,4 +180,8 @@ func (cms Store) GetKVStore(key types.StoreKey) types.KVStore {
 		panic(fmt.Sprintf("kv store with key %v has not been registered in stores", key))
 	}
 	return store.(types.KVStore)
+}
+
+func (cms Store) GetMemStore() types.MemStore {
+	return cms.memStore
 }

@@ -357,8 +357,8 @@ func (app *BaseApp) ApplySnapshotChunk(req *abci.RequestApplySnapshotChunk) (*ab
 // will contain relevant error information. Regardless of tx execution outcome,
 // the ResponseCheckTx will contain relevant gas execution context.
 func (app *BaseApp) CheckTx(req *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
-	app.mtx.RLock()
-	defer app.mtx.RUnlock()
+	app.checkTxMtx.RLock()
+	defer app.checkTxMtx.RUnlock()
 
 	var mode execMode
 
@@ -978,6 +978,8 @@ func (app *BaseApp) checkHalt(height int64, time time.Time) error {
 // height.
 func (app *BaseApp) Commit() (*abci.ResponseCommit, error) {
 	app.mtx.Lock()
+	app.checkTxMtx.Lock()
+	defer app.checkTxMtx.Unlock()
 	defer app.mtx.Unlock()
 
 	header := app.finalizeBlockState.Context().BlockHeader()

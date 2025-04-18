@@ -74,6 +74,7 @@ type BaseApp struct {
 	cms               storetypes.CommitMultiStore // Main (uncached) state
 	qms               storetypes.MultiStore       // Optional alternative multistore for querying only.
 	mtx               sync.RWMutex                // global ABCI mutex to handle concurrency in app (after switching to Comet unsync ABCI client)
+	checkTxMtx        sync.RWMutex                // global ABCI mutex to handle concurrency between parallel CheckTx and Commit calls (to make CheckTx actually parallel to other ABCI calls)
 	storeLoader       StoreLoader                 // function to handle store loading, may be overridden with SetStoreLoader()
 	grpcQueryRouter   *GRPCQueryRouter            // router for redirecting gRPC query calls
 	msgServiceRouter  *MsgServiceRouter           // router for redirecting Msg service messages
